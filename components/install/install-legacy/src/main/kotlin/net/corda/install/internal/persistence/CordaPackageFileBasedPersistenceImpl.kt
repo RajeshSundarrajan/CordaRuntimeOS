@@ -104,12 +104,11 @@ internal class CordaPackageFileBasedPersistenceImpl @Activate constructor(
 
     override fun putCpk(inputStream : InputStream) : CPK {
         val tmpFile = Files.createTempFile(cpkDirectory, null, ".cpk")
-        val expansionLocation = Files.createTempDirectory(expansionDirectory, "cpk")
         val cpk = TeeInputStream(inputStream, Files.newOutputStream(tmpFile)).use { teeStream ->
             try {
                 CPK.from(
                     inputStream = teeStream,
-                    cacheDir = expansionLocation,
+                    cacheDir = expansionDirectory,
                     verifySignature = true
                 ).also {
                     standaloneVerifiers.forEach { verifier -> verifier.verify(listOf(it.metadata)) }

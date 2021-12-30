@@ -142,9 +142,10 @@ class CordaPackagePersistenceTests {
     @Test
     fun `throws if a CPK cannot be stored to disk because the configuration admin's base-directory property isn't set`() {
         val configurationAdmin = createMockConfigurationAdmin(baseDirectory = null)
-        val cpkPersistence = CordaPackageFileBasedPersistenceImpl(configurationAdmin, emptyList(), emptyList())
-        assertThrows(CpkInstallationException::class.java) {
-            cpkPersistence.putCpk(Files.newInputStream(workflowCpkLocation))
+        CordaPackageFileBasedPersistenceImpl(configurationAdmin, emptyList(), emptyList()).use { cpkPersistence ->
+            assertThrows(CpkInstallationException::class.java) {
+                cpkPersistence.putCpk(Files.newInputStream(workflowCpkLocation))
+            }
         }
     }
 
