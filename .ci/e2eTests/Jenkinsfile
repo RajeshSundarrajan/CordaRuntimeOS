@@ -59,7 +59,7 @@ pipeline {
             steps {
                 sh '''
                     kubectl create ns $NAMESPACE
-                    kubectl label ns $NAMESPACE namespace-type=corda-e2e --overwrite=true
+                    kubectl label ns $NAMESPACE namespace-type=splunk-label --overwrite=true
                 '''
             }
         }
