@@ -6,24 +6,13 @@ import net.corda.crypto.core.CryptoConsts
 import net.corda.crypto.core.CryptoConsts.SigningKeyFilters.ALIAS_FILTER
 import net.corda.data.crypto.wire.ops.rpc.queries.CryptoKeyOrderBy
 import net.corda.data.membership.PersistentMemberInfo
-import net.corda.layeredpropertymap.LayeredPropertyMapFactory
-import net.corda.layeredpropertymap.create
-import net.corda.layeredpropertymap.toWire
 import net.corda.lifecycle.LifecycleCoordinatorFactory
 import net.corda.lifecycle.LifecycleStatus
+import net.corda.membership.GroupPolicy
+import net.corda.membership.MemberInfoFactory
 import net.corda.membership.exceptions.BadGroupPolicyException
 import net.corda.membership.grouppolicy.GroupPolicyProvider
-import net.corda.membership.impl.MGMContextImpl
-import net.corda.membership.impl.MemberContextImpl
-import net.corda.membership.impl.MemberInfoExtension
-import net.corda.membership.impl.MemberInfoExtension.Companion.GROUP_ID
-import net.corda.membership.impl.MemberInfoExtension.Companion.MODIFIED_TIME
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_NAME
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_OWNING_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.PLATFORM_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.SERIAL
-import net.corda.membership.impl.MemberInfoExtension.Companion.SOFTWARE_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.STATUS
+import net.corda.membership.impl.buildMerkleTree
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.ENDPOINT_PROTOCOL
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.ENDPOINT_URL
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.staticMembers
@@ -41,7 +30,19 @@ import net.corda.v5.cipher.suite.schemes.ECDSA_SECP256R1_CODE_NAME
 import net.corda.v5.crypto.DigestService
 import net.corda.v5.crypto.calculateHash
 import net.corda.v5.membership.EndpointInfo
+import net.corda.v5.membership.GROUP_ID
+import net.corda.v5.membership.IDENTITY_KEYS_KEY
+import net.corda.v5.membership.IDENTITY_KEY_HASHES_KEY
+import net.corda.v5.membership.MODIFIED_TIME
 import net.corda.v5.membership.MemberInfo
+import net.corda.v5.membership.PARTY_NAME
+import net.corda.v5.membership.PARTY_OWNING_KEY
+import net.corda.v5.membership.PLATFORM_VERSION
+import net.corda.v5.membership.PROTOCOL_VERSION
+import net.corda.v5.membership.SERIAL
+import net.corda.v5.membership.SOFTWARE_VERSION
+import net.corda.v5.membership.STATUS
+import net.corda.v5.membership.URL_KEY
 import net.corda.virtualnode.HoldingIdentity
 import net.corda.virtualnode.toAvro
 import org.osgi.service.component.annotations.Activate
@@ -67,8 +68,8 @@ class StaticMemberRegistrationService @Activate constructor(
     val configurationReadService: ConfigurationReadService,
     @Reference(service = LifecycleCoordinatorFactory::class)
     val coordinatorFactory: LifecycleCoordinatorFactory,
-    @Reference(service = LayeredPropertyMapFactory::class)
-    val layeredPropertyMapFactory: LayeredPropertyMapFactory,
+    @Reference(service = MemberInfoFactory::class)
+    val memberInfoFactory: MemberInfoFactory,
     @Reference(service = DigestService::class)
     val digestService: DigestService
 ) : MemberRegistrationService {
@@ -155,7 +156,7 @@ class StaticMemberRegistrationService @Activate constructor(
         val encodedMemberKey = keyEncodingService.encodeAsString(memberKey)
 
         @Suppress("SpreadOperator")
-        val memberProvidedContext = layeredPropertyMapFactory.create<MemberContextImpl>(
+        val memberProvidedContext = memberInfoFactory.create(
             sortedMapOf(
                 PARTY_NAME to memberName,
                 PARTY_OWNING_KEY to encodedMemberKey,
@@ -169,7 +170,7 @@ class StaticMemberRegistrationService @Activate constructor(
             )
         )
 
-        val mgmProvidedContext = layeredPropertyMapFactory.create<MGMContextImpl>(
+        val mgmProvidedContext = memberInfoFactory.create(
             sortedMapOf(
                 STATUS to staticMemberInfo.status,
                 MODIFIED_TIME to staticMemberInfo.modifiedTime,
@@ -256,13 +257,13 @@ class StaticMemberRegistrationService @Activate constructor(
         for (index in endpoints.indices) {
             result.add(
                 Pair(
-                    String.format(MemberInfoExtension.URL_KEY, index),
+                    String.format(URL_KEY, index),
                     endpoints[index].url
                 )
             )
             result.add(
                 Pair(
-                    String.format(MemberInfoExtension.PROTOCOL_VERSION, index),
+                    String.format(PROTOCOL_VERSION, index),
                     endpoints[index].protocolVersion.toString()
                 )
             )
@@ -280,7 +281,7 @@ class StaticMemberRegistrationService @Activate constructor(
         val identityKeys = listOf(owningKey)
         return identityKeys.mapIndexed { index, identityKey ->
             String.format(
-                MemberInfoExtension.IDENTITY_KEYS_KEY,
+                IDENTITY_KEYS_KEY,
                 index
             ) to identityKey
         }
@@ -297,7 +298,7 @@ class StaticMemberRegistrationService @Activate constructor(
         return identityKeys.mapIndexed { index, identityKey ->
             val hash = identityKey.calculateHash()
             String.format(
-                MemberInfoExtension.IDENTITY_KEY_HASHES_KEY,
+                IDENTITY_KEY_HASHES_KEY,
                 index
             ) to hash.toString()
         }

@@ -5,23 +5,6 @@ import net.corda.data.crypto.wire.CryptoSignatureWithKey
 import net.corda.data.membership.SignedMemberInfo
 import net.corda.layeredpropertymap.testkit.LayeredPropertyMapMocks
 import net.corda.layeredpropertymap.toWire
-import net.corda.membership.impl.MemberInfoExtension.Companion.GROUP_ID
-import net.corda.membership.impl.MemberInfoExtension.Companion.IDENTITY_KEYS
-import net.corda.membership.impl.MemberInfoExtension.Companion.IDENTITY_KEYS_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_ACTIVE
-import net.corda.membership.impl.MemberInfoExtension.Companion.MODIFIED_TIME
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_NAME
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_OWNING_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.PLATFORM_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.PROTOCOL_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.SERIAL
-import net.corda.membership.impl.MemberInfoExtension.Companion.SOFTWARE_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.STATUS
-import net.corda.membership.impl.MemberInfoExtension.Companion.URL_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.endpoints
-import net.corda.membership.impl.MemberInfoExtension.Companion.groupId
-import net.corda.membership.impl.MemberInfoExtension.Companion.modifiedTime
-import net.corda.membership.impl.MemberInfoExtension.Companion.status
 import net.corda.membership.impl.converter.EndpointInfoConverter
 import net.corda.membership.impl.converter.PublicKeyConverter
 import net.corda.v5.base.exceptions.ValueNotFoundException
@@ -29,7 +12,20 @@ import net.corda.v5.base.util.parse
 import net.corda.v5.base.util.parseList
 import net.corda.v5.cipher.suite.CipherSchemeMetadata
 import net.corda.v5.membership.EndpointInfo
+import net.corda.v5.membership.GROUP_ID
+import net.corda.v5.membership.IDENTITY_KEYS
+import net.corda.v5.membership.IDENTITY_KEYS_KEY
+import net.corda.v5.membership.MEMBER_STATUS_ACTIVE
+import net.corda.v5.membership.MODIFIED_TIME
 import net.corda.v5.membership.MemberInfo
+import net.corda.v5.membership.PARTY_NAME
+import net.corda.v5.membership.PARTY_OWNING_KEY
+import net.corda.v5.membership.PLATFORM_VERSION
+import net.corda.v5.membership.PROTOCOL_VERSION
+import net.corda.v5.membership.SERIAL
+import net.corda.v5.membership.SOFTWARE_VERSION
+import net.corda.v5.membership.STATUS
+import net.corda.v5.membership.URL_KEY
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.file.DataFileWriter
 import org.apache.avro.io.DatumReader
@@ -117,7 +113,7 @@ class MemberInfoTest {
 
         private fun convertEndpoints(): List<Pair<String, String>> {
             val result = mutableListOf<Pair<String, String>>()
-            for(i in endpoints.indices) {
+            for (i in endpoints.indices) {
                 result.add(Pair(String.format(URL_KEY, i), endpoints[i].url))
                 result.add(Pair(String.format(PROTOCOL_VERSION, i), endpoints[i].protocolVersion.toString()))
             }
@@ -125,18 +121,24 @@ class MemberInfoTest {
         }
 
         private fun convertPublicKeys(): List<Pair<String, String>> =
-            identityKeys.mapIndexed { i, identityKey -> String.format(IDENTITY_KEYS_KEY, i) to keyEncodingService.encodeAsString(identityKey) }
+            identityKeys.mapIndexed { i, identityKey ->
+                String.format(
+                    IDENTITY_KEYS_KEY,
+                    i
+                ) to keyEncodingService.encodeAsString(identityKey)
+            }
 
         private fun convertTestObjects(): List<Pair<String, String>> {
             val result = mutableListOf<Pair<String, String>>()
-            for(i in testObjects.indices) {
+            for (i in testObjects.indices) {
                 result.add((Pair(String.format(TEST_OBJECT_NUMBER, i), testObjects[i].number.toString())))
                 result.add((Pair(String.format(TEST_OBJECT_TEXT, i), testObjects[i].text)))
             }
             return result
         }
 
-        private fun createInvalidListFormat(): List<Pair<String, String>> = listOf(Pair("$INVALID_LIST_KEY.value", "invalidValue"))
+        private fun createInvalidListFormat(): List<Pair<String, String>> =
+            listOf(Pair("$INVALID_LIST_KEY.value", "invalidValue"))
 
         val MemberInfo.testObjects: List<DummyObjectWithNumberAndText>
             get() = this.memberProvidedContext.parseList("custom.testObjects")
@@ -197,7 +199,7 @@ class MemberInfoTest {
         var recreatedMemberInfo: MemberInfo? = null
         while (dataFileReader.hasNext()) {
             user = dataFileReader.next(user)
-            recreatedMemberInfo = toMemberInfo(
+            recreatedMemberInfo = MemberInfoImpl(
                 LayeredPropertyMapMocks.create<MemberContextImpl>(
                     KeyValuePairList.fromByteBuffer(user.memberContext).toSortedMap(), converters
                 ),
@@ -248,7 +250,11 @@ class MemberInfoTest {
     fun `parsing value fails when casting is impossible`() {
         val keys = memberInfo?.identityKeys
         assertEquals(identityKeys, keys)
-        assertFailsWith<ValueNotFoundException> { memberInfo?.memberProvidedContext?.parseList<EndpointInfo>(IDENTITY_KEYS) }
+        assertFailsWith<ValueNotFoundException> {
+            memberInfo?.memberProvidedContext?.parseList<EndpointInfo>(
+                IDENTITY_KEYS
+            )
+        }
     }
 
     @Test

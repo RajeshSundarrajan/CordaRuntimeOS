@@ -3,24 +3,16 @@ package net.corda.membership.impl.registration.staticnetwork
 import net.corda.configuration.read.ConfigChangedEvent
 import net.corda.configuration.read.ConfigurationReadService
 import net.corda.crypto.client.CryptoOpsClient
-import net.corda.data.KeyValuePairList
 import net.corda.data.membership.PersistentMemberInfo
 import net.corda.layeredpropertymap.LayeredPropertyMapFactory
-import net.corda.layeredpropertymap.create
 import net.corda.layeredpropertymap.impl.LayeredPropertyMapFactoryImpl
 import net.corda.lifecycle.LifecycleCoordinator
 import net.corda.lifecycle.LifecycleCoordinatorFactory
 import net.corda.lifecycle.LifecycleStatus
+import net.corda.lifecycle.RegistrationStatusChangeEvent
+import net.corda.membership.MemberInfoFactory
 import net.corda.membership.grouppolicy.GroupPolicyProvider
-import net.corda.membership.impl.MGMContextImpl
-import net.corda.membership.impl.MemberContextImpl
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_ACTIVE
-import net.corda.membership.impl.MemberInfoExtension.Companion.endpoints
-import net.corda.membership.impl.MemberInfoExtension.Companion.groupId
-import net.corda.membership.impl.MemberInfoExtension.Companion.identityKeyHashes
-import net.corda.membership.impl.MemberInfoExtension.Companion.modifiedTime
-import net.corda.membership.impl.MemberInfoExtension.Companion.softwareVersion
-import net.corda.membership.impl.MemberInfoExtension.Companion.status
+import net.corda.membership.impl.MemberInfoFactoryImpl
 import net.corda.membership.impl.converter.EndpointInfoConverter
 import net.corda.membership.impl.converter.PublicKeyConverter
 import net.corda.membership.impl.converter.PublicKeyHashConverter
@@ -33,7 +25,6 @@ import net.corda.membership.impl.registration.staticnetwork.TestUtils.Companion.
 import net.corda.membership.impl.registration.staticnetwork.TestUtils.Companion.groupPolicyWithInvalidStaticNetworkTemplate
 import net.corda.membership.impl.registration.staticnetwork.TestUtils.Companion.groupPolicyWithStaticNetwork
 import net.corda.membership.impl.registration.staticnetwork.TestUtils.Companion.groupPolicyWithoutStaticNetwork
-import net.corda.membership.impl.toMemberInfo
 import net.corda.membership.impl.toSortedMap
 import net.corda.membership.registration.MembershipRequestRegistrationOutcome.NOT_SUBMITTED
 import net.corda.membership.registration.MembershipRequestRegistrationOutcome.SUBMITTED
@@ -48,6 +39,8 @@ import net.corda.v5.crypto.DigestService
 import net.corda.v5.crypto.DigitalSignature
 import net.corda.v5.crypto.SecureHash
 import net.corda.v5.crypto.calculateHash
+import net.corda.v5.membership.MEMBER_STATUS_ACTIVE
+import net.corda.v5.membership.MEMBER_STATUS_SUSPENDED
 import net.corda.virtualnode.HoldingIdentity
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -160,6 +153,7 @@ class StaticMemberRegistrationServiceTest {
     private val layeredPropertyMapFactory: LayeredPropertyMapFactory = LayeredPropertyMapFactoryImpl(
         listOf(EndpointInfoConverter(), PublicKeyConverter(keyEncodingService), PublicKeyHashConverter())
     )
+    private val memberInfoFactory: MemberInfoFactory = MemberInfoFactoryImpl(layeredPropertyMapFactory)
 
     private val digestService: DigestService = mock {
         on { hash(any<ByteArray>(), any()) } doReturn SecureHash("SHA256", "1234ABCD".toByteArray())
@@ -172,7 +166,7 @@ class StaticMemberRegistrationServiceTest {
         cryptoOpsClient,
         configurationReadService,
         lifecycleCoordinatorFactory,
-        layeredPropertyMapFactory,
+        memberInfoFactory,
         digestService
     )
 

@@ -29,6 +29,8 @@ import net.corda.lifecycle.RegistrationStatusChangeEvent
 import net.corda.lifecycle.StartEvent
 import net.corda.lifecycle.StopEvent
 import net.corda.lifecycle.createCoordinator
+import net.corda.membership.datamodel.MembershipEntities
+import net.corda.membership.persistence.db.MembershipDatabasePersistenceService
 import net.corda.orm.JpaEntitiesRegistry
 import net.corda.permissions.model.RbacEntities
 import net.corda.permissions.storage.reader.PermissionStorageReaderService
@@ -80,6 +82,8 @@ class DBProcessorImpl @Activate constructor(
     private val cpiInfoWriteService: CpiInfoWriteService,
     @Reference(service = ReconcilerFactory::class)
     private val reconcilerFactory: ReconcilerFactory
+    @Reference(service = MembershipDatabasePersistenceService::class)
+    private val membershipDatabasePersistenceService: MembershipDatabasePersistenceService
 ) : DBProcessor {
     init {
         // define the different DB Entity Sets
@@ -92,6 +96,7 @@ class DBProcessorImpl @Activate constructor(
                     + CpiEntities.classes
         )
         entitiesRegistry.register(CordaDb.RBAC.persistenceUnitName, RbacEntities.classes)
+        entitiesRegistry.register(CordaDb.Vault.persistenceUnitName, MembershipEntities.classes)
     }
     companion object {
         private val log = contextLogger()
@@ -111,7 +116,8 @@ class DBProcessorImpl @Activate constructor(
         ::flowPersistenceService,
         ::cpkReadService,
         ::cpiInfoReadService,
-        ::cpiInfoWriteService
+        ::cpiInfoWriteService,
+        ::membershipDatabasePersistenceService
     )
 
     private var cpiInfoDbReader: CpiInfoDbReader? = null

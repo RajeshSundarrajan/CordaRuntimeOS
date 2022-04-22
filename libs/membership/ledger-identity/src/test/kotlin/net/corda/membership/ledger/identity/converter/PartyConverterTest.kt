@@ -4,10 +4,13 @@ import net.corda.layeredpropertymap.create
 import net.corda.layeredpropertymap.testkit.LayeredPropertyMapMocks
 import net.corda.membership.ledger.identity.PartyImpl
 import net.corda.membership.impl.MemberContextImpl
-import net.corda.membership.impl.MemberInfoExtension
 import net.corda.v5.base.types.MemberX500Name
 import net.corda.v5.cipher.suite.CipherSchemeMetadata
 import net.corda.v5.ledger.identity.Party
+import net.corda.v5.membership.NOTARY_SERVICE_PARTY_KEY
+import net.corda.v5.membership.NOTARY_SERVICE_PARTY_NAME
+import net.corda.v5.membership.PARTY_NAME
+import net.corda.v5.membership.PARTY_OWNING_KEY
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -30,10 +33,10 @@ class PartyConverterTest {
 
         val memberContext = layeredPropertyMapFactory.create<MemberContextImpl>(
             sortedMapOf(
-                MemberInfoExtension.PARTY_NAME to partyName,
-                MemberInfoExtension.PARTY_OWNING_KEY to KEY,
-                MemberInfoExtension.NOTARY_SERVICE_PARTY_NAME to notaryName,
-                MemberInfoExtension.NOTARY_SERVICE_PARTY_KEY to KEY
+                PARTY_NAME to partyName,
+                PARTY_OWNING_KEY to KEY,
+                NOTARY_SERVICE_PARTY_NAME to notaryName,
+                NOTARY_SERVICE_PARTY_KEY to KEY
             )
         )
 

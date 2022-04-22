@@ -8,6 +8,7 @@ import net.corda.lifecycle.DependentComponents
 import net.corda.lifecycle.LifecycleCoordinatorFactory
 import net.corda.lifecycle.createCoordinator
 import net.corda.membership.grouppolicy.GroupPolicyProvider
+import net.corda.membership.p2p.MembershipP2PReadService
 import net.corda.membership.service.MemberOpsService
 import net.corda.membership.registration.RegistrationProxy
 import net.corda.processors.member.MemberProcessor
@@ -36,7 +37,9 @@ class MemberProcessorImpl @Activate constructor(
     @Reference(service = CryptoOpsClient::class)
     private val cryptoOpsClient: CryptoOpsClient,
     @Reference(service = MemberOpsService::class)
-    private val memberOpsService: MemberOpsService
+    private val memberOpsService: MemberOpsService,
+    @Reference(service = MembershipP2PReadService::class)
+    private val membershipP2PReadService: MembershipP2PReadService
 ) : MemberProcessor {
 
     companion object {
@@ -50,7 +53,8 @@ class MemberProcessorImpl @Activate constructor(
         ::groupPolicyProvider,
         ::registrationProxy,
         ::cryptoOpsClient,
-        ::memberOpsService
+        ::memberOpsService,
+        ::membershipP2PReadService
     )
 
     private val coordinator =

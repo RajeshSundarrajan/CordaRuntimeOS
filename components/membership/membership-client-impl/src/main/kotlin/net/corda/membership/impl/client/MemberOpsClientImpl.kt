@@ -2,13 +2,14 @@ package net.corda.membership.impl.client
 
 import net.corda.configuration.read.ConfigChangedEvent
 import net.corda.configuration.read.ConfigurationReadService
+import net.corda.data.KeyValuePairList
 import net.corda.data.membership.rpc.request.MembershipRpcRequest
 import net.corda.data.membership.rpc.request.MembershipRpcRequestContext
-import net.corda.data.membership.rpc.request.RegistrationAction
-import net.corda.data.membership.rpc.request.RegistrationRequest
-import net.corda.data.membership.rpc.request.RegistrationStatusRequest
+import net.corda.data.membership.rpc.request.RegistrationRpcAction
+import net.corda.data.membership.rpc.request.RegistrationRpcRequest
+import net.corda.data.membership.rpc.request.RegistrationStatusRpcRequest
 import net.corda.data.membership.rpc.response.MembershipRpcResponse
-import net.corda.data.membership.rpc.response.RegistrationResponse
+import net.corda.data.membership.rpc.response.RegistrationRpcResponse
 import net.corda.lifecycle.LifecycleCoordinator
 import net.corda.lifecycle.LifecycleCoordinatorFactory
 import net.corda.lifecycle.LifecycleCoordinatorName
@@ -36,7 +37,7 @@ import org.osgi.service.component.annotations.Component
 import org.osgi.service.component.annotations.Reference
 import org.slf4j.Logger
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 @Component(service = [MemberOpsClient::class])
 class MemberOpsClientImpl @Activate constructor(
@@ -179,9 +180,10 @@ class MemberOpsClientImpl @Activate constructor(
                     UUID.randomUUID().toString(),
                     Instant.now()
                 ),
-                RegistrationRequest(
+                RegistrationRpcRequest(
                     memberRegistrationRequest.holdingIdentityId,
-                    RegistrationAction.valueOf(memberRegistrationRequest.action.name)
+                    RegistrationRpcAction.valueOf(memberRegistrationRequest.action.name),
+                    KeyValuePairList(emptyList()) //temp empty list
                 )
             )
 
@@ -194,7 +196,7 @@ class MemberOpsClientImpl @Activate constructor(
                     UUID.randomUUID().toString(),
                     Instant.now()
                 ),
-                RegistrationStatusRequest(holdingIdentityId)
+                RegistrationStatusRpcRequest(holdingIdentityId)
             )
 
             return registrationResponse(request.sendRequest())
@@ -203,7 +205,7 @@ class MemberOpsClientImpl @Activate constructor(
         override fun close() = rpcSender.close()
 
         @Suppress("SpreadOperator")
-        private fun registrationResponse(response: RegistrationResponse): RegistrationRequestProgressDto =
+        private fun registrationResponse(response: RegistrationRpcResponse): RegistrationRequestProgressDto =
             RegistrationRequestProgressDto(
                 response.registrationSent,
                 response.registrationStatus.toString(),

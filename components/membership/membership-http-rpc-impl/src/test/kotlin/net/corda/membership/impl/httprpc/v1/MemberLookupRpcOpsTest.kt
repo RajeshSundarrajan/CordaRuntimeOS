@@ -12,14 +12,6 @@ import net.corda.membership.httprpc.v1.types.response.RpcMemberInfoList
 import net.corda.membership.impl.EndpointInfoImpl
 import net.corda.membership.impl.MGMContextImpl
 import net.corda.membership.impl.MemberContextImpl
-import net.corda.membership.impl.MemberInfoExtension
-import net.corda.membership.impl.MemberInfoExtension.Companion.GROUP_ID
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_ACTIVE
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_NAME
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_OWNING_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.PLATFORM_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.SERIAL
-import net.corda.membership.impl.MemberInfoExtension.Companion.SOFTWARE_VERSION
 import net.corda.membership.impl.MemberInfoImpl
 import net.corda.membership.impl.converter.EndpointInfoConverter
 import net.corda.membership.impl.converter.PublicKeyConverter
@@ -28,7 +20,19 @@ import net.corda.membership.read.MembershipGroupReaderProvider
 import net.corda.v5.cipher.suite.CipherSchemeMetadata
 import net.corda.v5.crypto.SecureHash
 import net.corda.v5.membership.EndpointInfo
+import net.corda.v5.membership.GROUP_ID
+import net.corda.v5.membership.IDENTITY_KEYS_KEY
+import net.corda.v5.membership.MEMBER_STATUS_ACTIVE
+import net.corda.v5.membership.MODIFIED_TIME
 import net.corda.v5.membership.MemberInfo
+import net.corda.v5.membership.PARTY_NAME
+import net.corda.v5.membership.PARTY_OWNING_KEY
+import net.corda.v5.membership.PLATFORM_VERSION
+import net.corda.v5.membership.PROTOCOL_VERSION
+import net.corda.v5.membership.SERIAL
+import net.corda.v5.membership.SOFTWARE_VERSION
+import net.corda.v5.membership.STATUS
+import net.corda.v5.membership.URL_KEY
 import net.corda.virtualnode.HoldingIdentity
 import net.corda.virtualnode.VirtualNodeInfo
 import net.corda.virtualnode.read.VirtualNodeInfoReadService
@@ -121,8 +125,8 @@ class MemberLookupRpcOpsTest {
         ),
         mgmProvidedContext = layeredPropertyMapFactory.create<MGMContextImpl>(
             sortedMapOf(
-                MemberInfoExtension.STATUS to MEMBER_STATUS_ACTIVE,
-                MemberInfoExtension.MODIFIED_TIME to Instant.now().toString()
+                STATUS to MEMBER_STATUS_ACTIVE,
+                MODIFIED_TIME to Instant.now().toString()
             )
         )
     )
@@ -130,7 +134,7 @@ class MemberLookupRpcOpsTest {
     private fun convertPublicKeys(): List<Pair<String, String>> =
         keys.mapIndexed { index, identityKey ->
             String.format(
-                MemberInfoExtension.IDENTITY_KEYS_KEY,
+                IDENTITY_KEYS_KEY,
                 index
             ) to keyEncodingService.encodeAsString(identityKey)
         }
@@ -140,13 +144,13 @@ class MemberLookupRpcOpsTest {
         for (index in endpoints.indices) {
             result.add(
                 Pair(
-                    String.format(MemberInfoExtension.URL_KEY, index),
+                    String.format(URL_KEY, index),
                     endpoints[index].url
                 )
             )
             result.add(
                 Pair(
-                    String.format(MemberInfoExtension.PROTOCOL_VERSION, index),
+                    String.format(PROTOCOL_VERSION, index),
                     endpoints[index].protocolVersion.toString()
                 )
             )

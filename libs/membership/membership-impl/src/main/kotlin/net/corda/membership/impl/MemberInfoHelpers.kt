@@ -11,13 +11,6 @@ import java.nio.ByteBuffer
 import java.util.SortedMap
 
 /**
- * Recreates [MemberInfo] with [MemberContext] and [MGMContext] after avro deserialization.
- */
-fun toMemberInfo(memberContext: MemberContext, mgmContext: MGMContext): MemberInfo {
-    return MemberInfoImpl(memberContext, mgmContext)
-}
-
-/**
  * Validates the order of the key, we are making sure they are not tampered with.
  */
 fun validateKeyOrder(original: KeyValuePairList) {
@@ -35,7 +28,7 @@ fun KeyValuePairList.toSortedMap(): SortedMap<String, String?> {
     // before returning the ordered map, do the validation of ordering
     // (to avoid malicious attacks where extra data is attached to the end of the context)
     validateKeyOrder(this)
-    return this.items.map { it.key to it.value }.toMap().toSortedMap()
+    return items.associate { it.key to it.value }.toSortedMap()
 }
 
 /**
