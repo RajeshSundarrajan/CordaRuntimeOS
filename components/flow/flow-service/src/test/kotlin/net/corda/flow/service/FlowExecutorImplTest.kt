@@ -28,7 +28,7 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
-class FlowExecutorTest {
+class FlowExecutorImplTest {
 
     companion object {
         private const val GROUP_NAME_KEY = "manager.consumer.group"
@@ -62,11 +62,11 @@ class FlowExecutorTest {
             anyOrNull()
         )
 
-        val flowExecutor = FlowExecutor(coordinatorFactory, config, subscriptionFactory, flowEventProcessorFactory)
+        val flowExecutorImpl = FlowExecutorImpl(coordinatorFactory, subscriptionFactory, flowEventProcessorFactory)
 
-        flowExecutor.start()
+        flowExecutorImpl.start()
         assertTrue(messageSubscription.isStarted)
-        flowExecutor.stop()
+        flowExecutorImpl.stop()
         assertFalse(messageSubscription.isStarted)
 
         verify(subscriptionFactory, times(1)).createStateAndEventSubscription<FlowKey, Checkpoint, FlowEvent>(
