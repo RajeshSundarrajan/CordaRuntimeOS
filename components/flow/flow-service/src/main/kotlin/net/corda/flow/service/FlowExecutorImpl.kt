@@ -19,32 +19,48 @@ import net.corda.schema.Schemas.Flow.Companion.FLOW_EVENT_TOPIC
 import net.corda.schema.configuration.ConfigKeys.FLOW_CONFIG
 import net.corda.v5.base.util.contextLogger
 import net.corda.v5.base.util.debug
+import org.osgi.service.component.annotations.Activate
 import org.osgi.service.component.annotations.Reference
 
 @Suppress("LongParameterList")
-class FlowExecutorImpl(
-    @Reference(service = LifecycleCoordinatorFactory::class)
+class FlowExecutorImpl @Activate constructor(
     coordinatorFactory: LifecycleCoordinatorFactory,
-    @Reference(service = SubscriptionFactory::class)
     private val subscriptionFactory: SubscriptionFactory,
-    @Reference(service = FlowEventProcessorFactory::class)
     private val flowEventProcessorFactory: FlowEventProcessorFactory,
-    @Reference(service = FlowWakeUpScheduler::class)
-    private val flowWakeUpScheduler: FlowWakeUpScheduler
+    private val flowWakeUpScheduler: FlowWakeUpScheduler,
+    private val toMessagingConfig: (Map<String, SmartConfig>) -> SmartConfig
 ) : FlowExecutor {
+
+    @Activate
+    constructor(
+        @Reference(service = LifecycleCoordinatorFactory::class)
+        coordinatorFactory: LifecycleCoordinatorFactory,
+        @Reference(service = SubscriptionFactory::class)
+        subscriptionFactory: SubscriptionFactory,
+        @Reference(service = FlowEventProcessorFactory::class)
+        flowEventProcessorFactory: FlowEventProcessorFactory,
+        @Reference(service = FlowWakeUpScheduler::class)
+        flowWakeUpScheduler: FlowWakeUpScheduler
+    ) : this(
+        coordinatorFactory,
+        subscriptionFactory,
+        flowEventProcessorFactory,
+        flowWakeUpScheduler,
+        { cfg -> cfg.toMessagingConfig() }
+    )
 
     companion object {
         private val log = contextLogger()
         private const val CONSUMER_GROUP = "FlowEventConsumer"
     }
 
-    private val coordinator = coordinatorFactory.createCoordinator<FlowExecutorImpl> { event, _ -> eventHandler(event) }
+    private val coordinator = coordinatorFactory.createCoordinator<FlowExecutor> { event, _ -> eventHandler(event) }
     private var subscription: StateAndEventSubscription<String, Checkpoint, FlowEvent>? = null
     private var subscriptionRegistrationHandle: RegistrationHandle? = null
 
     override fun onConfigChange(config: Map<String, SmartConfig>) {
         try {
-            val messagingConfig = config.toMessagingConfig()
+            val messagingConfig = toMessagingConfig(config)
             val flowConfig = checkNotNull(config[FLOW_CONFIG]) { "Failed to find a FLOW_CONFIG section in '${config}'" }
 
             // close the lifecycle registration first to prevent down being signaled
@@ -78,7 +94,7 @@ class FlowExecutorImpl(
     }
 
     override fun stop() {
-        coordinator.close()
+        coordinator.stop()
     }
 
     private fun eventHandler(event: LifecycleEvent) {
