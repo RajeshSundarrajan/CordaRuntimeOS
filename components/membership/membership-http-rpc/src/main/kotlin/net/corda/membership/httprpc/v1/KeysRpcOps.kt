@@ -139,4 +139,47 @@ interface KeysRpcOps : RpcOps {
         @HttpRpcPathParameter(description = "The Key ID.")
         keyId: String,
     ): String
+
+    /**
+     * POST endpoint which Generate a certificate signing request (CSR) for a holding identity.
+     *
+     * @param holdingIdentityId The Holding identity IDs.
+     * @param keyId The Key ID.
+     * @param x500name A valid X500 name.
+     * @param emailAddress The email address.
+     * @param keyUsageExtension - OID to a valid key usage extension (default to server auth).
+     * @param subjectAlternativeNames - list of subject alternative DNS names
+     *
+     * @return The CSR in PEM format.
+     */
+    @HttpRpcPOST(
+        path = "{holdingIdentityId}/{keyId}",
+        description = "Generate certificate signing request (CSR)."
+    )
+    fun generateCsr(
+        @HttpRpcPathParameter(description = "The Holding Identity ID.")
+        holdingIdentityId: String,
+        @HttpRpcPathParameter(description = "The Key ID.")
+        keyId: String,
+        @HttpRpcRequestBodyParameter(
+            description = "The X500 name",
+            required = true,
+        )
+        x500name: String,
+        @HttpRpcRequestBodyParameter(
+            description = "The email address",
+            required = true,
+        )
+        emailAddress: String,
+        @HttpRpcRequestBodyParameter(
+            description = "The key usage extension",
+            required = false,
+        )
+        keyUsageExtension: String? = null,
+        @HttpRpcRequestBodyParameter(
+            description = "Subject alternative names",
+            required = false,
+        )
+        subjectAlternativeNames: Collection<String>?,
+    ): String
 }
