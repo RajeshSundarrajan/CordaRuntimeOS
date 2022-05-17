@@ -2,11 +2,15 @@ package net.corda.membership.impl.p2p
 
 import com.typesafe.config.ConfigFactory
 import net.corda.configuration.read.ConfigurationReadService
+import net.corda.data.CordaAvroDeserializer
+import net.corda.data.CordaAvroSerializationFactory
+import net.corda.data.CordaAvroSerializer
 import net.corda.data.KeyValuePair
 import net.corda.data.KeyValuePairList
 import net.corda.data.crypto.wire.CryptoSignatureWithKey
 import net.corda.data.identity.HoldingIdentity
 import net.corda.data.membership.command.registration.RegistrationCommand
+import net.corda.data.membership.command.registration.StartRegistration
 import net.corda.data.membership.p2p.MembershipRegistrationRequest
 import net.corda.data.membership.state.RegistrationState
 import net.corda.db.messagebus.testkit.DBSetup
@@ -31,12 +35,14 @@ import net.corda.p2p.app.AppMessage
 import net.corda.p2p.app.UnauthenticatedMessage
 import net.corda.p2p.app.UnauthenticatedMessageHeader
 import net.corda.schema.Schemas
+import net.corda.schema.Schemas.Membership.Companion.REGISTRATION_COMMANDS
 import net.corda.schema.configuration.MessagingConfig
 import net.corda.test.util.eventually
 import net.corda.v5.base.types.MemberX500Name
 import net.corda.v5.base.util.contextLogger
 import net.corda.v5.base.util.seconds
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.fail
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -45,6 +51,8 @@ import org.osgi.test.common.annotation.InjectService
 import org.osgi.test.junit5.service.ServiceExtension
 import java.nio.ByteBuffer
 import java.util.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @ExtendWith(ServiceExtension::class, DBSetup::class)
 class MembershipP2PIntegrationTest {
@@ -65,6 +73,9 @@ class MembershipP2PIntegrationTest {
         @InjectService(timeout = 5000)
         lateinit var membershipP2PReadService: MembershipP2PReadService
 
+        @InjectService
+        lateinit var cordaAvroSerializationFactory: CordaAvroSerializationFactory
+
         val logger = contextLogger()
 
         private const val BOOT_CONFIG_STRING = """
@@ -75,6 +86,9 @@ class MembershipP2PIntegrationTest {
         private val bootConfig = smartConfigFactory.create(ConfigFactory.parseString(BOOT_CONFIG_STRING))
 
         private lateinit var p2pSender: Publisher
+        private lateinit var registrationRequestSerializer: CordaAvroSerializer<MembershipRegistrationRequest>
+        private lateinit var keyValuePairListSerializer: CordaAvroSerializer<KeyValuePairList>
+        private lateinit var keyValuePairListDeserializer: CordaAvroDeserializer<KeyValuePairList>
 
         const val MEMBER_CONTEXT_KEY = "key"
         const val MEMBER_CONTEXT_VALUE = "value"
@@ -104,12 +118,17 @@ class MembershipP2PIntegrationTest {
             }
             coordinator.start()
 
+            registrationRequestSerializer = cordaAvroSerializationFactory.createAvroSerializer { }
+            keyValuePairListSerializer = cordaAvroSerializationFactory.createAvroSerializer { }
+            keyValuePairListDeserializer =
+                cordaAvroSerializationFactory.createAvroDeserializer({}, KeyValuePairList::class.java)
+
             configurationReadService.startAndWait()
             membershipP2PReadService.startAndWait()
             configurationReadService.bootstrapConfig(bootConfig)
 
             p2pSender = publisherFactory.createPublisher(
-                PublisherConfig("membership_p2p_test"),
+                PublisherConfig("membership_p2p_test_sender"),
                 messagingConfig = bootConfig
             ).also {
                 it.start()
@@ -132,75 +151,134 @@ class MembershipP2PIntegrationTest {
 
     @Test
     fun `membership p2p service reads registration requests from the p2p topic and puts them on a membership topic for further processing`() {
-        var callback: ((RegistrationState?, Record<String, RegistrationCommand>) -> Unit)? = null
+        val groupId = UUID.randomUUID().toString()
+        val source = MemberX500Name.parse("O=Alice,C=GB,L=London").toString()
+        val sourceHoldingIdentity = net.corda.virtualnode.HoldingIdentity(source, groupId)
+        val destination = MemberX500Name.parse("O=MGM,C=GB,L=London").toString()
+        val registrationId = UUID.randomUUID().toString()
+        val fakeKey = "fakeKey"
+        val fakeSig = "fakeSig"
+        val countDownLatch = CountDownLatch(1)
+        var result: Pair<RegistrationState?, Record<String, RegistrationCommand>>? = null
 
+        // Set up subscription to gather results of processing p2p message
+        val registrationRequestSubscription = subscriptionFactory.createStateAndEventSubscription(
+            SubscriptionConfig("membership_p2p_test_receiver", REGISTRATION_COMMANDS),
+            getTestProcessor { s, e ->
+                result = Pair(s, e)
+                countDownLatch.countDown()
+            },
+            messagingConfig = bootConfig
+        ).also { it.start() }
+
+        val memberContext = KeyValuePairList(
+            listOf(
+                KeyValuePair(
+                    MEMBER_CONTEXT_KEY,
+                    MEMBER_CONTEXT_VALUE
+                )
+            )
+        )
+        val fakeSigWithKey = CryptoSignatureWithKey(
+            ByteBuffer.wrap(fakeKey.encodeToByteArray()),
+            ByteBuffer.wrap(fakeSig.encodeToByteArray()),
+        )
+        val messageHeader = UnauthenticatedMessageHeader(
+            HoldingIdentity(destination, groupId),
+            HoldingIdentity(source, groupId),
+            MEMBERSHIP_P2P_SUBSYSTEM
+        )
+        val message = MembershipRegistrationRequest(
+            registrationId,
+            ByteBuffer.wrap(keyValuePairListSerializer.serialize(memberContext)),
+            fakeSigWithKey
+        )
+
+        // Publish P2P message requesting registration
+        val sendFuture = p2pSender.publish(
+            listOf(
+                buildUnauthenticatedP2PRequest(
+                    messageHeader,
+                    ByteBuffer.wrap(registrationRequestSerializer.serialize(message))
+                )
+            )
+        )
+
+        // Wait for latch to countdown so we know when processing has completed and results have been collected
+        try {
+            countDownLatch.await(5, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            fail("P2P message was not processed in an expected amount of time.")
+        } finally {
+            registrationRequestSubscription.close()
+            p2pSender.close()
+        }
+
+        // Assert Results
+        assertThat(sendFuture.size).isEqualTo(1)
+        assertThat(sendFuture.single().isDone).isTrue
+        assertThat(result).isNotNull
+        assertThat(result?.first).isNull()
+        assertThat(result?.second).isNotNull
+        with(result!!.second) {
+            assertThat(topic).isEqualTo(REGISTRATION_COMMANDS)
+            assertThat(key).isEqualTo(sourceHoldingIdentity.id)
+            assertThat(value).isNotNull
+            assertThat(value!!).isInstanceOf(RegistrationCommand::class.java)
+            assertThat(value!!.command).isNotNull
+            assertThat(value!!.command).isInstanceOf(StartRegistration::class.java)
+            with(value!!.command as StartRegistration) {
+                assertThat(this.destination.x500Name).isEqualTo(destination)
+                assertThat(this.destination.groupId).isEqualTo(groupId)
+                assertThat(this.source.x500Name).isEqualTo(source)
+                assertThat(this.source.groupId).isEqualTo(groupId)
+                assertThat(this.memberRegistrationRequest).isNotNull
+                with(memberRegistrationRequest) {
+                    assertThat(this.registrationId).isEqualTo(registrationId)
+                    val deserializedContext = keyValuePairListDeserializer.deserialize(this.memberContext.array())
+                    assertThat(deserializedContext).isNotNull
+                    assertThat(deserializedContext).isEqualTo(memberContext)
+                    assertThat(deserializedContext!!.items.size).isEqualTo(1)
+                    assertThat(deserializedContext.items.single().key).isEqualTo(MEMBER_CONTEXT_KEY)
+                    assertThat(deserializedContext.items.single().value).isEqualTo(MEMBER_CONTEXT_VALUE)
+                    assertThat(this.memberSignature).isEqualTo(fakeSigWithKey)
+                    assertThat(this.memberSignature.publicKey.array().decodeToString()).isEqualTo(fakeKey)
+                    assertThat(this.memberSignature.bytes.array().decodeToString()).isEqualTo(fakeSig)
+                }
+            }
+        }
+    }
+
+    private fun buildUnauthenticatedP2PRequest(
+        messageHeader: UnauthenticatedMessageHeader,
+        payload: ByteBuffer
+    ): Record<String, AppMessage> {
+        return Record(
+            Schemas.P2P.P2P_IN_TOPIC,
+            UUID.randomUUID().toString(),
+            AppMessage(
+                UnauthenticatedMessage(
+                    messageHeader,
+                    payload
+                )
+            )
+        )
+    }
+
+    private fun getTestProcessor(resultCollector: (RegistrationState?, Record<String, RegistrationCommand>) -> Unit): StateAndEventProcessor<String, RegistrationState, RegistrationCommand> {
         class TestProcessor : StateAndEventProcessor<String, RegistrationState, RegistrationCommand> {
             override fun onNext(
                 state: RegistrationState?,
                 event: Record<String, RegistrationCommand>
             ): StateAndEventProcessor.Response<RegistrationState> {
-                callback?.invoke(state, event)
+                resultCollector(state, event)
                 return StateAndEventProcessor.Response(null, emptyList())
             }
 
             override val keyClass = String::class.java
             override val stateValueClass = RegistrationState::class.java
             override val eventValueClass = RegistrationCommand::class.java
-
         }
-
-        val registrationRequestSubscription = subscriptionFactory.createStateAndEventSubscription(
-            SubscriptionConfig("membership_p2p_test", Schemas.Membership.REGISTRATION_COMMANDS),
-            TestProcessor(),
-            messagingConfig = bootConfig
-        ).also { it.start() }
-
-        var result: Pair<RegistrationState?, Record<String, RegistrationCommand>>? = null
-        callback = { s, e ->
-            registrationRequestSubscription.close()
-            result = Pair(s, e)
-        }
-
-        val groupId = UUID.randomUUID().toString()
-        val source = MemberX500Name.parse("O=Alice,C=GB,L=London").toString()
-        val destination = MemberX500Name.parse("O=MGM,C=GB,L=London").toString()
-        val registrationId = UUID.randomUUID().toString()
-
-        p2pSender.publish(
-            listOf(
-                Record(
-                    Schemas.P2P.P2P_IN_TOPIC,
-                    UUID.randomUUID().toString(),
-                    AppMessage(
-                        UnauthenticatedMessage(
-                            UnauthenticatedMessageHeader(
-                                HoldingIdentity(source, groupId),
-                                HoldingIdentity(destination, groupId),
-                                MEMBERSHIP_P2P_SUBSYSTEM
-                            ),
-                            MembershipRegistrationRequest(
-                                registrationId,
-                                KeyValuePairList(
-                                    listOf(
-                                        KeyValuePair(
-                                            MEMBER_CONTEXT_KEY,
-                                            MEMBER_CONTEXT_VALUE
-                                        )
-                                    )
-                                ).toByteBuffer(),
-                                CryptoSignatureWithKey(
-                                    ByteBuffer.wrap("fakeKey".encodeToByteArray()),
-                                    ByteBuffer.wrap("fakeSig".encodeToByteArray()),
-                                )
-                            ).toByteBuffer()
-                        )
-                    )
-                )
-            )
-        )
-
-        eventually {
-            assertThat(result).isNotNull
-        }
+        return TestProcessor()
     }
 }

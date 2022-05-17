@@ -34,8 +34,7 @@ class MembershipP2PProcessor(
             .filter { it.isMembershipSubsystem() }
             .mapNotNull { msg ->
                 val classType = try {
-                    //avroSchemaRegistry.getClassType(msg.payload)
-                    MembershipRegistrationRequest::class.java
+                    avroSchemaRegistry.getClassType(msg.payload)
                 } catch (ex: UnsupportedOperationException) {
                     logger.error("Error parsing message payload.", ex)
                     null

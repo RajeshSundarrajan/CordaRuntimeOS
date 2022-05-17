@@ -146,6 +146,7 @@ class RegistrationManagementServiceImpl @Activate constructor(
                     ),
                     messagingConfig
                 ).also { it.start() }
+                logger.info("Received config, started subscriptions and setting status to UP")
                 coordinator.updateStatus(LifecycleStatus.UP)
             }
         }
