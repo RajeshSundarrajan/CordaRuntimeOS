@@ -82,6 +82,7 @@ class FlowService @Activate constructor(
                         configSections
                     )
                 }
+                coordinator.updateStatus(event.status)
             }
 
             is ConfigChangedEvent -> {
