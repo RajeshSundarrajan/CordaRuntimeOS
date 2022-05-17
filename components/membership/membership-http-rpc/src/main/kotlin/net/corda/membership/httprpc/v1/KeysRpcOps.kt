@@ -152,6 +152,7 @@ interface KeysRpcOps : RpcOps {
      *
      * @return The CSR in PEM format.
      */
+    @Suppress("LongParameterList")
     @HttpRpcPOST(
         path = "{holdingIdentityId}/{keyId}",
         description = "Generate certificate signing request (CSR)."
