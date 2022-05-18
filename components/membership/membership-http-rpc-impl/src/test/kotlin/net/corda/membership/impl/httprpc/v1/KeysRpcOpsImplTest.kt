@@ -66,10 +66,12 @@ class KeysRpcOpsImplTest {
                 val idToReturn = "id.$it"
                 val aliasToReturn = "alias-$it"
                 val categoryToReturn = "category:$it"
+                val scheme = "scheme($it)"
                 mock<CryptoSigningKey> {
                     on { id } doReturn idToReturn
                     on { alias } doReturn aliasToReturn
                     on { category } doReturn categoryToReturn
+                    on { schemeCodeName } doReturn scheme
                 }
             }
             whenever(cryptoOpsClient.lookup("id", 0, 500, CryptoKeyOrderBy.NONE, emptyMap())).doReturn(keys)
@@ -78,16 +80,16 @@ class KeysRpcOpsImplTest {
 
             assertThat(list)
                 .containsEntry(
-                    "id.1", KeyMetaData("id.1", "alias-1", "category:1")
+                    "id.1", KeyMetaData("id.1", "alias-1", "category:1", "scheme(1)")
                 )
                 .containsEntry(
-                    "id.2", KeyMetaData("id.2", "alias-2", "category:2")
+                    "id.2", KeyMetaData("id.2", "alias-2", "category:2", "scheme(2)")
                 )
                 .containsEntry(
-                    "id.3", KeyMetaData("id.3", "alias-3", "category:3")
+                    "id.3", KeyMetaData("id.3", "alias-3", "category:3", "scheme(3)")
                 )
                 .containsEntry(
-                    "id.4", KeyMetaData("id.4", "alias-4", "category:4")
+                    "id.4", KeyMetaData("id.4", "alias-4", "category:4", "scheme(4)")
                 )
         }
 
@@ -96,13 +98,34 @@ class KeysRpcOpsImplTest {
             val publicKey = mock<PublicKey> {
                 on { encoded } doReturn byteArrayOf(1, 2, 3)
             }
-            whenever(cryptoOpsClient.generateKeyPair("tenantId", "category", "alias")).doReturn(publicKey)
+            whenever(cryptoOpsClient.generateKeyPair("tenantId", "category", "alias", "scheme")).doReturn(publicKey)
 
-            val id = keysOps.generateKeyPair(holdingIdentityId = "tenantId", alias = "alias", hsmCategory = "category")
+            val id = keysOps.generateKeyPair(holdingIdentityId = "tenantId", alias = "alias", hsmCategory = "category", scheme = "scheme")
 
             assertThat(id).isEqualTo(publicKey.publicKeyId())
         }
 
+        @Test
+        fun `generateKeyPair without a scheme use the first scheme`() {
+            val publicKey = mock<PublicKey> {
+                on { encoded } doReturn byteArrayOf(1, 2, 3)
+            }
+            whenever(cryptoOpsClient.getSupportedSchemes("tenantId", "category")).doReturn(listOf("sc1", "sc2"))
+            whenever(cryptoOpsClient.generateKeyPair(any(), any(), any(), any(), any<Map<String, String>>())).doReturn(publicKey)
+
+            keysOps.generateKeyPair(holdingIdentityId = "tenantId", alias = "alias", hsmCategory = "category", scheme = null)
+
+            verify(cryptoOpsClient).generateKeyPair("tenantId", "category", "alias", "sc1")
+        }
+
+        @Test
+        fun `generateKeyPair without a scheme throw an exception if there are no schemes`() {
+            whenever(cryptoOpsClient.getSupportedSchemes("tenantId", "category")).doReturn(emptyList())
+
+            assertThrows<ResourceNotFoundException> {
+                keysOps.generateKeyPair(holdingIdentityId = "tenantId", alias = "alias", hsmCategory = "category", scheme = null)
+            }
+        }
         @Test
         fun `generateKeyPem returns the keys PEMs`() {
             val keyId = "keyId"
@@ -131,7 +154,17 @@ class KeysRpcOpsImplTest {
                 keysOps.generateKeyPem(holdingIdentityId, keyId)
             }
         }
+
+        @Test
+        fun `listSchemes return list of schemes`() {
+            whenever(cryptoOpsClient.getSupportedSchemes("id", "category")).doReturn(listOf("one", "two"))
+
+            val schemes = keysOps.listSchemes("id", "category")
+
+            assertThat(schemes).containsExactlyInAnyOrder("one", "two")
+        }
     }
+
     @Nested
     inner class LifeCycleTests {
         @Test

@@ -53,6 +53,13 @@ class KeysRpcOpsImpl @Activate constructor(
     @Reference(service = CipherSchemeMetadata::class)
     private val cipherSchemeMetadata: CipherSchemeMetadata,
 ) : KeysRpcOps, PluggableRPCOps<KeysRpcOps>, Lifecycle {
+    override fun listSchemes(
+        holdingIdentityId: String,
+        hsmCategory: String,
+    ): Collection<String> = cryptoOpsClient.getSupportedSchemes(
+        tenantId = holdingIdentityId,
+        category = hsmCategory
+    )
 
     override fun listKeys(holdingIdentityId: String): Map<String, KeyMetaData> {
 
@@ -62,14 +69,25 @@ class KeysRpcOpsImpl @Activate constructor(
             500,
             CryptoKeyOrderBy.NONE,
             emptyMap()
-        ).associate { it.id to KeyMetaData(keyId = it.id, alias = it.alias, hsmCategory = it.category) }
+        ).associate { it.id to KeyMetaData(keyId = it.id, alias = it.alias, hsmCategory = it.category, scheme = it.schemeCodeName) }
     }
 
-    override fun generateKeyPair(holdingIdentityId: String, alias: String, hsmCategory: String): String {
+    override fun generateKeyPair(
+        holdingIdentityId: String,
+        alias: String,
+        hsmCategory: String,
+        scheme: String?
+    ): String {
         return cryptoOpsClient.generateKeyPair(
             tenantId = holdingIdentityId,
             category = hsmCategory,
-            alias = alias
+            alias = alias,
+            scheme = scheme ?: cryptoOpsClient
+                .getSupportedSchemes(
+                    tenantId = holdingIdentityId, category = hsmCategory
+                ).firstOrNull()
+                ?: throw ResourceNotFoundException("Could not find any scheme for $holdingIdentityId and $hsmCategory")
+
         ).publicKeyId()
     }
 
