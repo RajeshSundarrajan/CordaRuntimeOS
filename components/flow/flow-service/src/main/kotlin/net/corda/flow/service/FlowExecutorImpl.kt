@@ -20,10 +20,12 @@ import net.corda.schema.configuration.ConfigKeys.FLOW_CONFIG
 import net.corda.v5.base.util.contextLogger
 import net.corda.v5.base.util.debug
 import org.osgi.service.component.annotations.Activate
+import org.osgi.service.component.annotations.Component
 import org.osgi.service.component.annotations.Reference
 
 @Suppress("LongParameterList")
-class FlowExecutorImpl @Activate constructor(
+@Component(service = [FlowExecutor::class])
+class FlowExecutorImpl constructor(
     coordinatorFactory: LifecycleCoordinatorFactory,
     private val subscriptionFactory: SubscriptionFactory,
     private val flowEventProcessorFactory: FlowEventProcessorFactory,
