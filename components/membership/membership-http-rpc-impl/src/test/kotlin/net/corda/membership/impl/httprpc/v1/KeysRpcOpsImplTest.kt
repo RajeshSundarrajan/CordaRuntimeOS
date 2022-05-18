@@ -12,6 +12,7 @@ import net.corda.lifecycle.RegistrationStatusChangeEvent
 import net.corda.membership.httprpc.v1.types.response.KeyMetaData
 import net.corda.v5.cipher.suite.CipherSchemeMetadata
 import net.corda.v5.cipher.suite.KeyEncodingService
+import net.corda.v5.cipher.suite.schemes.COMPOSITE_KEY_TEMPLATE
 import net.corda.v5.cipher.suite.schemes.ECDSA_SECP256K1_SHA256_TEMPLATE
 import net.corda.v5.crypto.DigitalSignature
 import net.corda.v5.crypto.publicKeyId
@@ -457,6 +458,24 @@ class KeysRpcOpsImplTest {
         @Test
         fun `it will throw an exception for invalid schema name`() {
             whenever(cipherSchemeMetadata.schemes).doReturn(emptyArray())
+
+            assertThrows<ResourceNotFoundException> {
+                keysOps.generateCsr(
+                    holdingIdentityId,
+                    keyId,
+                    x500Name,
+                    email,
+                    null,
+                    null,
+                )
+            }
+        }
+
+        @Test
+        fun `it will throw an exception for schema without algorithm identifier`() {
+            val schema = COMPOSITE_KEY_TEMPLATE.makeScheme("TEST")
+            whenever(cipherSchemeMetadata.schemes).doReturn(arrayOf(schema))
+            whenever(key.schemeCodeName).doReturn(schema.codeName)
 
             assertThrows<ResourceNotFoundException> {
                 keysOps.generateCsr(

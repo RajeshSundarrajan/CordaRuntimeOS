@@ -214,7 +214,8 @@ class KeysRpcOpsImpl @Activate constructor(
             val scheme = cipherSchemeMetadata.schemes.firstOrNull {
                 it.codeName == cryptoSigningKey.schemeCodeName
             } ?: throw ResourceNotFoundException("Can not find any schema ${cryptoSigningKey.schemeCodeName}")
-            return scheme.algorithmOIDs.first()
+            return scheme.signatureSpec.signatureOID
+                ?: throw ResourceNotFoundException("Can not find algorithm identifier for ${scheme.signatureSpec.signatureName}")
         }
 
         override fun getOutputStream() = outputStream
