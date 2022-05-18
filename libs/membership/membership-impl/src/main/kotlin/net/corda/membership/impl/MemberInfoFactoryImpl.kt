@@ -32,7 +32,7 @@ class MemberInfoFactoryImpl @Activate constructor(
         )
     }
 
-    override fun createFromAvro(memberInfo: net.corda.data.membership.MemberInfo) = with(memberInfo) {
+    override fun createFromAvro(memberInfo: net.corda.data.membership.PersistentMemberInfo) = with(memberInfo) {
         create(memberContext.toSortedMap(), mgmContext.toSortedMap())
     }
 }

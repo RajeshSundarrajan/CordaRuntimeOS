@@ -1,6 +1,7 @@
 package net.corda.membership.impl.registration.dynamic.processing.handler
 
 import net.corda.data.KeyValuePairList
+import net.corda.data.membership.PersistentMemberInfo
 import net.corda.data.membership.command.registration.DeclineRegistration
 import net.corda.data.membership.command.registration.RegistrationCommand
 import net.corda.data.membership.command.registration.StartRegistration
@@ -170,9 +171,12 @@ class StartRegistrationHandler(
 
     private fun persistMemberInfo(mgm: HoldingIdentity, memberInfo: MemberInfo) {
         logger.info("Persisting the member info request.")
+        val avroMemberInfo = memberInfo.toAvro()
         MembershipPersistenceRequest(
             buildMembershipRequestContext(mgm.id),
-            PersistMemberInfo(listOf(memberInfo.toAvro()))
+            PersistMemberInfo(listOf(
+                PersistentMemberInfo(mgm.toAvro(), avroMemberInfo.memberContext, avroMemberInfo.mgmContext)
+            ))
         ).execute()
     }
 

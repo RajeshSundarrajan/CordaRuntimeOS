@@ -81,7 +81,7 @@ class DBProcessorImpl @Activate constructor(
     @Reference(service = CpiInfoWriteService::class)
     private val cpiInfoWriteService: CpiInfoWriteService,
     @Reference(service = ReconcilerFactory::class)
-    private val reconcilerFactory: ReconcilerFactory
+    private val reconcilerFactory: ReconcilerFactory,
     @Reference(service = MembershipDatabasePersistenceService::class)
     private val membershipDatabasePersistenceService: MembershipDatabasePersistenceService
 ) : DBProcessor {

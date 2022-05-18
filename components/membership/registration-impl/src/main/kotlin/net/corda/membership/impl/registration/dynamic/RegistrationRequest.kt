@@ -2,8 +2,9 @@ package net.corda.membership.impl.registration.dynamic
 
 import net.corda.v5.base.types.LayeredPropertyMap
 import net.corda.v5.base.util.parse
+import net.corda.v5.membership.REGISTRATION_ID
 
-interface RegistrationRequest: LayeredPropertyMap {
+interface RegistrationRequest : LayeredPropertyMap {
     val registrationId: String
 }
 
@@ -12,7 +13,7 @@ class RegistrationRequestImpl(
 ) : LayeredPropertyMap by map, RegistrationRequest {
 
     override val registrationId: String
-        get() = parse(MemberInfoExtension.REGISTRATION_ID)
+        get() = parse(REGISTRATION_ID)
 
     override fun hashCode(): Int {
         return map.hashCode()

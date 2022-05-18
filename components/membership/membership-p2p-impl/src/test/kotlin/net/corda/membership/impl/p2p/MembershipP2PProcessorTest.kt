@@ -4,6 +4,7 @@ import net.corda.data.KeyValuePair
 import net.corda.data.KeyValuePairList
 import net.corda.data.crypto.wire.CryptoSignatureWithKey
 import net.corda.data.identity.HoldingIdentity
+import net.corda.data.membership.command.registration.RegistrationCommand
 import net.corda.data.membership.command.registration.StartRegistration
 import net.corda.data.membership.p2p.MembershipRegistrationRequest
 import net.corda.membership.impl.p2p.MembershipP2PProcessor.Companion.MEMBERSHIP_P2P_SUBSYSTEM
@@ -76,13 +77,15 @@ class MembershipP2PProcessorTest {
         Assertions.assertTrue(result.isNotEmpty())
         Assertions.assertEquals(1, result.size)
         Assertions.assertEquals(REGISTRATION_COMMANDS, result.first().topic)
-        Assertions.assertTrue(result.first().value is StartRegistration)
+        Assertions.assertTrue(result.first().value is RegistrationCommand)
         Assertions.assertEquals(source.toCorda().id, result.first().key)
 
-        val value = result.first().value as StartRegistration
-        Assertions.assertEquals(destination, value.destination)
-        Assertions.assertEquals(source, value.source)
-        Assertions.assertEquals(registrationRequest, value.memberRegistrationRequest)
+        val value = result.first().value as RegistrationCommand
+        Assertions.assertTrue(value.command is StartRegistration)
+        val command = value.command as StartRegistration
+        Assertions.assertEquals(destination, command.destination)
+        Assertions.assertEquals(source, command.source)
+        Assertions.assertEquals(registrationRequest, command.memberRegistrationRequest)
     }
 
     @Test

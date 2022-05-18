@@ -3,8 +3,6 @@ package net.corda.membership.impl.registration.staticnetwork
 import net.corda.libs.configuration.SmartConfig
 import net.corda.membership.impl.GroupPolicyExtension.Companion.GROUP_ID
 import net.corda.membership.impl.GroupPolicyImpl
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_ACTIVE
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_SUSPENDED
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.ENDPOINT_PROTOCOL
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.ENDPOINT_URL
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.KEY_ALIAS
@@ -16,6 +14,8 @@ import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplate
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.STATIC_NETWORK_TEMPLATE
 import net.corda.schema.configuration.ConfigKeys
 import net.corda.v5.base.types.MemberX500Name
+import net.corda.v5.membership.MEMBER_STATUS_ACTIVE
+import net.corda.v5.membership.MEMBER_STATUS_SUSPENDED
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 

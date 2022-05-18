@@ -1,13 +1,11 @@
 package net.corda.membership.impl.read.reader
 
-import net.corda.membership.impl.MemberInfoExtension.Companion.IDENTITY_KEY_HASHES
 import net.corda.membership.impl.read.TestProperties
 import net.corda.membership.impl.read.TestProperties.Companion.GROUP_ID_1
 import net.corda.membership.impl.read.cache.MemberListCache
 import net.corda.membership.impl.read.cache.MembershipGroupReadCache
 import net.corda.v5.crypto.PublicKeyHash
 import net.corda.v5.crypto.sha256Bytes
-import net.corda.v5.membership.MemberContext
 import net.corda.v5.membership.MemberInfo
 import net.corda.virtualnode.HoldingIdentity
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -36,20 +34,14 @@ class MembershipGroupReaderImplTest {
     private val suspendedMemberInfo: MemberInfo = mock {
         on { name } doReturn aliceName
         on { identityKeys } doReturn listOf(knownKey)
-        val mockedMemberProvidedContext = mock<MemberContext> {
-            on { parseSet(eq(IDENTITY_KEY_HASHES), eq(PublicKeyHash::class.java)) } doReturn setOf(knownKeyHash)
-        }
-        on { memberProvidedContext } doReturn mockedMemberProvidedContext
+        on { identityKeyHashes } doReturn setOf(knownKeyHash)
         on { isActive } doReturn false
     }
 
     private val activeMemberInfo: MemberInfo = mock {
         on { name } doReturn aliceName
         on { identityKeys } doReturn listOf(knownKey)
-        val mockedMemberProvidedContext = mock<MemberContext> {
-            on { parseSet(eq(IDENTITY_KEY_HASHES), eq(PublicKeyHash::class.java)) } doReturn setOf(knownKeyHash)
-        }
-        on { memberProvidedContext } doReturn mockedMemberProvidedContext
+        on { identityKeyHashes } doReturn setOf(knownKeyHash)
         on { isActive } doReturn true
     }
 
@@ -110,6 +102,9 @@ class MembershipGroupReaderImplTest {
     @Test
     fun `lookup throws illegal state exception if no cached member list available`() {
         val error = assertThrows<IllegalStateException> { membershipGroupReaderImpl.lookup() }
-        assertEquals("Failed to find member list for ID='${aliceIdGroup1.id}, Group ID='${aliceIdGroup1.groupId}'",error.message)
+        assertEquals(
+            "Failed to find member list for ID='${aliceIdGroup1.id}, Group ID='${aliceIdGroup1.groupId}'",
+            error.message
+        )
     }
 }

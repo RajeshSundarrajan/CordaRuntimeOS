@@ -1,36 +1,32 @@
 package net.corda.membership.impl.read.subscription
 
 import net.corda.data.membership.PersistentMemberInfo
-import net.corda.layeredpropertymap.LayeredPropertyMapFactory
-import net.corda.layeredpropertymap.create
 import net.corda.layeredpropertymap.testkit.LayeredPropertyMapMocks
-import net.corda.layeredpropertymap.toWire
+import net.corda.membership.MemberInfoFactory
 import net.corda.membership.impl.EndpointInfoImpl
-import net.corda.membership.impl.MGMContextImpl
-import net.corda.membership.impl.MemberContextImpl
-import net.corda.membership.impl.MemberInfoExtension.Companion.GROUP_ID
-import net.corda.membership.impl.MemberInfoExtension.Companion.IDENTITY_KEYS_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_ACTIVE
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_PENDING
-import net.corda.membership.impl.MemberInfoExtension.Companion.MEMBER_STATUS_SUSPENDED
-import net.corda.membership.impl.MemberInfoExtension.Companion.MODIFIED_TIME
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_NAME
-import net.corda.membership.impl.MemberInfoExtension.Companion.PARTY_OWNING_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.PLATFORM_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.PROTOCOL_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.SERIAL
-import net.corda.membership.impl.MemberInfoExtension.Companion.SOFTWARE_VERSION
-import net.corda.membership.impl.MemberInfoExtension.Companion.STATUS
-import net.corda.membership.impl.MemberInfoExtension.Companion.URL_KEY
-import net.corda.membership.impl.MemberInfoExtension.Companion.groupId
-import net.corda.membership.impl.MemberInfoImpl
+import net.corda.membership.impl.MemberInfoFactoryImpl
 import net.corda.membership.impl.converter.EndpointInfoConverter
 import net.corda.membership.impl.converter.PublicKeyConverter
 import net.corda.membership.impl.read.cache.MembershipGroupReadCache
 import net.corda.messaging.api.records.Record
 import net.corda.v5.cipher.suite.CipherSchemeMetadata
 import net.corda.v5.membership.EndpointInfo
+import net.corda.v5.membership.GROUP_ID
+import net.corda.v5.membership.IDENTITY_KEYS_KEY
+import net.corda.v5.membership.MEMBER_STATUS_ACTIVE
+import net.corda.v5.membership.MEMBER_STATUS_PENDING
+import net.corda.v5.membership.MEMBER_STATUS_SUSPENDED
+import net.corda.v5.membership.MODIFIED_TIME
 import net.corda.v5.membership.MemberInfo
+import net.corda.v5.membership.PARTY_NAME
+import net.corda.v5.membership.PARTY_OWNING_KEY
+import net.corda.v5.membership.PLATFORM_VERSION
+import net.corda.v5.membership.PROTOCOL_VERSION
+import net.corda.v5.membership.SERIAL
+import net.corda.v5.membership.SOFTWARE_VERSION
+import net.corda.v5.membership.STATUS
+import net.corda.v5.membership.URL_KEY
+import net.corda.v5.membership.toAvro
 import net.corda.virtualnode.HoldingIdentity
 import net.corda.virtualnode.toAvro
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -52,7 +48,7 @@ class MemberListProcessorTest {
             EndpointInfoImpl("https://corda5.r3.com:10001", 10)
         )
         private val identityKeys = listOf(knownKey, knownKey)
-        private lateinit var layeredPropertyMapFactory: LayeredPropertyMapFactory
+        private lateinit var memberInfoFactory: MemberInfoFactory
         private val converters = listOf(
             EndpointInfoConverter(),
             PublicKeyConverter(keyEncodingService),
@@ -71,25 +67,22 @@ class MemberListProcessorTest {
         private lateinit var membershipGroupReadCache: MembershipGroupReadCache
 
         @Suppress("SpreadOperator")
-        private fun createTestMemberInfo(x500Name: String, status: String): MemberInfo = MemberInfoImpl(
-            memberProvidedContext = layeredPropertyMapFactory.create<MemberContextImpl>(
-                sortedMapOf(
-                    PARTY_NAME to x500Name,
-                    PARTY_OWNING_KEY to knownKeyAsString,
-                    GROUP_ID to "DEFAULT_MEMBER_GROUP_ID",
-                    *convertPublicKeys().toTypedArray(),
-                    *convertEndpoints().toTypedArray(),
-                    SOFTWARE_VERSION to "5.0.0",
-                    PLATFORM_VERSION to "10",
-                    SERIAL to "1",
-                )
+        private fun createTestMemberInfo(x500Name: String, status: String): MemberInfo = memberInfoFactory.create(
+            sortedMapOf(
+                PARTY_NAME to x500Name,
+                PARTY_OWNING_KEY to knownKeyAsString,
+                GROUP_ID to "DEFAULT_MEMBER_GROUP_ID",
+                *convertPublicKeys().toTypedArray(),
+                *convertEndpoints().toTypedArray(),
+                SOFTWARE_VERSION to "5.0.0",
+                PLATFORM_VERSION to "10",
+                SERIAL to "1",
             ),
-            mgmProvidedContext = layeredPropertyMapFactory.create<MGMContextImpl>(
-                sortedMapOf(
-                    STATUS to status,
-                    MODIFIED_TIME to modifiedTime.toString(),
-                )
+            sortedMapOf(
+                STATUS to status,
+                MODIFIED_TIME to modifiedTime.toString(),
             )
+
         )
 
         private fun convertToTestTopicData(
@@ -98,18 +91,19 @@ class MemberListProcessorTest {
         ): Map<String, PersistentMemberInfo> {
             val topicData = mutableMapOf<String, PersistentMemberInfo>()
             memberInfoList.forEach { member ->
+                val avroMemberInfo = member.toAvro()
                 val holdingIdentity = HoldingIdentity(member.name.toString(), member.groupId)
                 if (!selfOwned && holdingIdentity != aliceIdentity) {
                     topicData[aliceIdentity.id + holdingIdentity.id] = PersistentMemberInfo(
                         aliceIdentity.toAvro(),
-                        member.memberProvidedContext.toWire(),
-                        member.mgmProvidedContext.toWire()
+                        avroMemberInfo.memberContext,
+                        avroMemberInfo.mgmContext
                     )
                 }
                 topicData[holdingIdentity.id] = PersistentMemberInfo(
                     holdingIdentity.toAvro(),
-                    member.memberProvidedContext.toWire(),
-                    member.mgmProvidedContext.toWire()
+                    avroMemberInfo.memberContext,
+                    avroMemberInfo.mgmContext
                 )
             }
             return topicData
@@ -145,9 +139,9 @@ class MemberListProcessorTest {
         @JvmStatic
         @BeforeAll
         fun setUp() {
-            layeredPropertyMapFactory = LayeredPropertyMapMocks.createFactory(converters)
+            memberInfoFactory = MemberInfoFactoryImpl(LayeredPropertyMapMocks.createFactory(converters))
             membershipGroupReadCache = MembershipGroupReadCache.Impl()
-            memberListProcessor = MemberListProcessor(membershipGroupReadCache, layeredPropertyMapFactory)
+            memberListProcessor = MemberListProcessor(membershipGroupReadCache, memberInfoFactory)
             whenever(keyEncodingService.decodePublicKey(knownKeyAsString)).thenReturn(knownKey)
             whenever(keyEncodingService.encodeAsString(knownKey)).thenReturn(knownKeyAsString)
             alice = createTestMemberInfo("O=Alice,L=London,C=GB", MEMBER_STATUS_PENDING)
@@ -195,10 +189,11 @@ class MemberListProcessorTest {
         val updatedAlice = createTestMemberInfo("O=Alice,L=London,C=GB", MEMBER_STATUS_ACTIVE)
         val topicData = convertToTestTopicData(listOf(updatedAlice), true).entries.first()
         val newRecord = Record("dummy-topic", topicData.key, topicData.value)
+        val aliceAvro = alice.toAvro()
         val oldValue = PersistentMemberInfo(
             aliceIdentity.toAvro(),
-            alice.memberProvidedContext.toWire(),
-            alice.mgmProvidedContext.toWire()
+            aliceAvro.memberContext,
+            aliceAvro.mgmContext
         )
         memberListProcessor.onNext(newRecord, oldValue, memberListFromTopic)
         assertEquals(

@@ -2,7 +2,6 @@ package net.corda.membership.impl.registration.staticnetwork
 
 import net.corda.configuration.read.ConfigChangedEvent
 import net.corda.configuration.read.ConfigurationReadService
-import net.corda.layeredpropertymap.LayeredPropertyMapFactory
 import net.corda.lifecycle.LifecycleCoordinator
 import net.corda.lifecycle.LifecycleCoordinatorFactory
 import net.corda.lifecycle.LifecycleCoordinatorName
@@ -11,6 +10,7 @@ import net.corda.lifecycle.RegistrationHandle
 import net.corda.lifecycle.RegistrationStatusChangeEvent
 import net.corda.lifecycle.StartEvent
 import net.corda.lifecycle.StopEvent
+import net.corda.membership.MemberInfoFactory
 import net.corda.membership.grouppolicy.GroupPolicyProvider
 import net.corda.membership.impl.registration.staticnetwork.TestUtils.Companion.configs
 import net.corda.messaging.api.publisher.Publisher
@@ -52,7 +52,7 @@ class RegistrationServiceLifecycleHandlerTest {
         on { createCoordinator(any(), any()) } doReturn coordinator
     }
 
-    private val layeredPropertyMapFactory: LayeredPropertyMapFactory = mock()
+    private val memberInfoFactory: MemberInfoFactory = mock()
 
     private val digestService: DigestService = mock()
 
@@ -63,7 +63,7 @@ class RegistrationServiceLifecycleHandlerTest {
         mock(),
         configurationReadService,
         coordinatorFactory,
-        layeredPropertyMapFactory,
+        memberInfoFactory,
         digestService
     )
 

@@ -9,7 +9,6 @@ import net.corda.layeredpropertymap.impl.LayeredPropertyMapFactoryImpl
 import net.corda.lifecycle.LifecycleCoordinator
 import net.corda.lifecycle.LifecycleCoordinatorFactory
 import net.corda.lifecycle.LifecycleStatus
-import net.corda.lifecycle.RegistrationStatusChangeEvent
 import net.corda.membership.MemberInfoFactory
 import net.corda.membership.grouppolicy.GroupPolicyProvider
 import net.corda.membership.impl.MemberInfoFactoryImpl
@@ -40,7 +39,6 @@ import net.corda.v5.crypto.DigitalSignature
 import net.corda.v5.crypto.SecureHash
 import net.corda.v5.crypto.calculateHash
 import net.corda.v5.membership.MEMBER_STATUS_ACTIVE
-import net.corda.v5.membership.MEMBER_STATUS_SUSPENDED
 import net.corda.virtualnode.HoldingIdentity
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -207,13 +205,9 @@ class StaticMemberRegistrationServiceTest {
 
         assertEquals(Schemas.Membership.MEMBER_LIST_TOPIC, publishedInfo.topic)
         val persistentMemberPublished = publishedInfo.value as PersistentMemberInfo
-        val memberPublished = toMemberInfo(
-            layeredPropertyMapFactory.create<MemberContextImpl>(
-                KeyValuePairList.fromByteBuffer(persistentMemberPublished.memberContext).toSortedMap()
-            ),
-            layeredPropertyMapFactory.create<MGMContextImpl>(
-                KeyValuePairList.fromByteBuffer(persistentMemberPublished.mgmContext).toSortedMap()
-            )
+        val memberPublished = memberInfoFactory.create(
+            persistentMemberPublished.memberContext.toSortedMap(),
+            persistentMemberPublished.mgmContext.toSortedMap()
         )
         assertEquals(DUMMY_GROUP_ID, memberPublished.groupId)
         assertNotNull(memberPublished.softwareVersion)

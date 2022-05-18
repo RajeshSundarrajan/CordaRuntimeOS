@@ -5,7 +5,8 @@ import net.corda.configuration.read.ConfigurationReadService
 import net.corda.data.KeyValuePair
 import net.corda.data.KeyValuePairList
 import net.corda.data.crypto.wire.CryptoSignatureWithKey
-import net.corda.data.membership.MemberInfo
+import net.corda.data.identity.HoldingIdentity
+import net.corda.data.membership.PersistentMemberInfo
 import net.corda.data.membership.db.request.MembershipPersistenceRequest
 import net.corda.data.membership.db.request.MembershipRequestContext
 import net.corda.data.membership.db.request.command.PersistMemberInfo
@@ -72,6 +73,7 @@ import org.osgi.test.common.annotation.InjectService
 import org.osgi.test.junit5.service.ServiceExtension
 import java.nio.ByteBuffer
 import java.time.Instant
+import java.util.*
 import java.util.UUID.randomUUID
 import javax.persistence.EntityManagerFactory
 
@@ -112,6 +114,9 @@ class MembershipPersistenceTest {
         private const val MEMBER_CONTEXT_KEY = "key"
         private const val MEMBER_CONTEXT_VALUE = "value"
 
+        private val groupId = UUID.randomUUID().toString()
+        private val x500Name = MemberX500Name.parse("O=Alice, C=GB, L=London")
+        private val viewOwningHoldingIdentity = HoldingIdentity(x500Name.toString(), groupId)
         private val holdingIdentityId: String =
             randomUUID().toString().toByteArray().sha256Bytes().toHexString().take(12)
 
@@ -270,31 +275,38 @@ class MembershipPersistenceTest {
         val groupId = randomUUID().toString()
         val memberx500Name = MemberX500Name.parse("O=Alice, C=GB, L=London")
         val endpointUrl = "http://localhost:8080"
-        val memberInfo = MemberInfo(
-            KeyValuePairList(
-                listOf(
-                    KeyValuePair(String.format(URL_KEY, "0"), endpointUrl),
-                    KeyValuePair(String.format(PROTOCOL_VERSION, "0"), "1"),
-                    KeyValuePair(GROUP_ID, groupId),
-                    KeyValuePair(PARTY_NAME, memberx500Name.toString()),
-                    KeyValuePair(PLATFORM_VERSION, "11"),
-                    KeyValuePair(SERIAL, "1"),
-                    KeyValuePair(SOFTWARE_VERSION, "5.0.0"),
-                )
-            ),
-            KeyValuePairList(
-                listOf(
-                    KeyValuePair(STATUS, MEMBER_STATUS_ACTIVE)
-                )
+        val memberContext = KeyValuePairList(
+            listOf(
+                KeyValuePair(String.format(URL_KEY, "0"), endpointUrl),
+                KeyValuePair(String.format(PROTOCOL_VERSION, "0"), "1"),
+                KeyValuePair(GROUP_ID, groupId),
+                KeyValuePair(PARTY_NAME, memberx500Name.toString()),
+                KeyValuePair(PLATFORM_VERSION, "11"),
+                KeyValuePair(SERIAL, "1"),
+                KeyValuePair(SOFTWARE_VERSION, "5.0.0")
             )
         )
+        val mgmContext = KeyValuePairList(
+            listOf(
+                KeyValuePair(STATUS, MEMBER_STATUS_ACTIVE)
+            )
+        )
+
         val rpcRequest = MembershipPersistenceRequest(
             MembershipRequestContext(
                 Instant.now(),
                 randomUUID().toString(),
                 holdingIdentityId
             ),
-            PersistMemberInfo(listOf(memberInfo))
+            PersistMemberInfo(
+                listOf(
+                    PersistentMemberInfo(
+                        viewOwningHoldingIdentity,
+                        memberContext,
+                        mgmContext
+                    )
+                )
+            )
         )
         val rpcResponse = assertDoesNotThrow {
             rpcSender.sendRequest(rpcRequest).getOrThrow(5.seconds)
@@ -322,31 +334,31 @@ class MembershipPersistenceTest {
         assertThat(persistedEntity.serialNumber).isEqualTo(1)
         assertThat(persistedEntity.status).isEqualTo(MEMBER_STATUS_ACTIVE)
 
-        val mgmContext =
+        val persistedMgmContext =
             KeyValuePairList.fromByteBuffer(
                 ByteBuffer.wrap(persistedEntity.mgmContext)
             ).items.associate { it.key to it.value }
-        assertThat(mgmContext[STATUS]).isNotNull
-        assertThat(mgmContext[STATUS]).isEqualTo(MEMBER_STATUS_ACTIVE)
+        assertThat(persistedMgmContext[STATUS]).isNotNull
+        assertThat(persistedMgmContext[STATUS]).isEqualTo(MEMBER_STATUS_ACTIVE)
 
-        val memberContext =
+        val persistedMemberContext =
             KeyValuePairList.fromByteBuffer(
                 ByteBuffer.wrap(persistedEntity.memberContext)
             ).items.associate { it.key to it.value }
 
-        assertThat(memberContext[String.format(URL_KEY, "0")]).isNotNull
-        assertThat(memberContext[String.format(URL_KEY, "0")]).isEqualTo(endpointUrl)
-        assertThat(memberContext[String.format(PROTOCOL_VERSION, "0")]).isNotNull
-        assertThat(memberContext[String.format(PROTOCOL_VERSION, "0")]).isEqualTo("1")
-        assertThat(memberContext[GROUP_ID]).isNotNull
-        assertThat(memberContext[GROUP_ID]).isEqualTo(groupId)
-        assertThat(memberContext[PARTY_NAME]).isNotNull
-        assertThat(memberContext[PARTY_NAME]).isEqualTo(memberx500Name.toString())
-        assertThat(memberContext[PLATFORM_VERSION]).isNotNull
-        assertThat(memberContext[PLATFORM_VERSION]).isEqualTo("11")
-        assertThat(memberContext[SERIAL]).isNotNull
-        assertThat(memberContext[SERIAL]).isEqualTo("1")
-        assertThat(memberContext[SOFTWARE_VERSION]).isNotNull
-        assertThat(memberContext[SOFTWARE_VERSION]).isEqualTo( "5.0.0")
+        assertThat(persistedMemberContext[String.format(URL_KEY, "0")]).isNotNull
+        assertThat(persistedMemberContext[String.format(URL_KEY, "0")]).isEqualTo(endpointUrl)
+        assertThat(persistedMemberContext[String.format(PROTOCOL_VERSION, "0")]).isNotNull
+        assertThat(persistedMemberContext[String.format(PROTOCOL_VERSION, "0")]).isEqualTo("1")
+        assertThat(persistedMemberContext[GROUP_ID]).isNotNull
+        assertThat(persistedMemberContext[GROUP_ID]).isEqualTo(groupId)
+        assertThat(persistedMemberContext[PARTY_NAME]).isNotNull
+        assertThat(persistedMemberContext[PARTY_NAME]).isEqualTo(memberx500Name.toString())
+        assertThat(persistedMemberContext[PLATFORM_VERSION]).isNotNull
+        assertThat(persistedMemberContext[PLATFORM_VERSION]).isEqualTo("11")
+        assertThat(persistedMemberContext[SERIAL]).isNotNull
+        assertThat(persistedMemberContext[SERIAL]).isEqualTo("1")
+        assertThat(persistedMemberContext[SOFTWARE_VERSION]).isNotNull
+        assertThat(persistedMemberContext[SOFTWARE_VERSION]).isEqualTo("5.0.0")
     }
 }

@@ -8,11 +8,9 @@ import net.corda.data.crypto.wire.ops.rpc.queries.CryptoKeyOrderBy
 import net.corda.data.membership.PersistentMemberInfo
 import net.corda.lifecycle.LifecycleCoordinatorFactory
 import net.corda.lifecycle.LifecycleStatus
-import net.corda.membership.GroupPolicy
 import net.corda.membership.MemberInfoFactory
 import net.corda.membership.exceptions.BadGroupPolicyException
 import net.corda.membership.grouppolicy.GroupPolicyProvider
-import net.corda.membership.impl.buildMerkleTree
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.ENDPOINT_PROTOCOL
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.ENDPOINT_URL
 import net.corda.membership.impl.registration.staticnetwork.StaticMemberTemplateExtension.Companion.staticMembers
@@ -43,6 +41,7 @@ import net.corda.v5.membership.SERIAL
 import net.corda.v5.membership.SOFTWARE_VERSION
 import net.corda.v5.membership.STATUS
 import net.corda.v5.membership.URL_KEY
+import net.corda.v5.membership.toAvro
 import net.corda.virtualnode.HoldingIdentity
 import net.corda.virtualnode.toAvro
 import org.osgi.service.component.annotations.Activate
@@ -149,14 +148,15 @@ class StaticMemberRegistrationService @Activate constructor(
 
         val staticMemberInfo = staticMemberList.firstOrNull {
             MemberX500Name.parse(it.name!!) == MemberX500Name.parse(memberName)
-        } ?: throw IllegalArgumentException("Our membership " + memberName + " is not listed in the static member list.")
+        }
+            ?: throw IllegalArgumentException("Our membership " + memberName + " is not listed in the static member list.")
 
         validateStaticMemberDeclaration(staticMemberInfo)
         val memberKey = getIdentityKey(staticMemberInfo, memberId)
         val encodedMemberKey = keyEncodingService.encodeAsString(memberKey)
 
         @Suppress("SpreadOperator")
-        val memberProvidedContext = memberInfoFactory.create(
+        val memberInfo = memberInfoFactory.create(
             sortedMapOf(
                 PARTY_NAME to memberName,
                 PARTY_OWNING_KEY to encodedMemberKey,
@@ -167,15 +167,12 @@ class StaticMemberRegistrationService @Activate constructor(
                 SOFTWARE_VERSION to staticMemberInfo.softwareVersion,
                 PLATFORM_VERSION to staticMemberInfo.platformVersion,
                 SERIAL to staticMemberInfo.serial,
-            )
-        )
-
-        val mgmProvidedContext = memberInfoFactory.create(
+            ),
             sortedMapOf(
                 STATUS to staticMemberInfo.status,
                 MODIFIED_TIME to staticMemberInfo.modifiedTime,
             )
-        )
+        ).toAvro()
 
         staticMemberList.forEach {
             val owningMemberName = MemberX500Name.parse(it.name!!).toString()
@@ -184,7 +181,11 @@ class StaticMemberRegistrationService @Activate constructor(
                 Record(
                     MEMBER_LIST_TOPIC,
                     owningMemberHoldingIdentity.id + "-" + memberId,
-                    PersistentMemberInfo(owningMemberHoldingIdentity.toAvro(), memberProvidedContext.toWire(), mgmProvidedContext.toWire())
+                    PersistentMemberInfo(
+                        owningMemberHoldingIdentity.toAvro(),
+                        memberInfo.memberContext,
+                        memberInfo.mgmContext
+                    )
                 )
             )
         }

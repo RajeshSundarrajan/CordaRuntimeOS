@@ -17,6 +17,6 @@ interface MemberInfoFactory {
     ): MemberInfo
 
     fun createFromAvro(
-        memberInfo: net.corda.data.membership.MemberInfo
+        memberInfo: net.corda.data.membership.PersistentMemberInfo
     ): MemberInfo
 }
