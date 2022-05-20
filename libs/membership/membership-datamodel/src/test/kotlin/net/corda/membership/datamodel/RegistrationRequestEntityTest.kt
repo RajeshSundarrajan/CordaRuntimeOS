@@ -41,12 +41,14 @@ class RegistrationRequestEntityTest {
             HOLDING_ID_1,
             REGISTRATION_STATUS_1,
             currentInstant,
+            currentInstant,
             getRegistrationContext(KEY_1 to VALUE_1)
         )
         val e2 = RegistrationRequestEntity(
             registrationId,
             HOLDING_ID_2,
             REGISTRATION_STATUS_2,
+            currentInstant.minusSeconds(5),
             currentInstant.minusSeconds(5),
             getRegistrationContext(KEY_2 to VALUE_2)
         )
@@ -61,12 +63,14 @@ class RegistrationRequestEntityTest {
             HOLDING_ID_1,
             REGISTRATION_STATUS_1,
             currentInstant,
+            currentInstant,
             getRegistrationContext(KEY_1 to VALUE_1)
         )
         val e2 = RegistrationRequestEntity(
             randomId,
             HOLDING_ID_2,
             REGISTRATION_STATUS_2,
+            currentInstant.minusSeconds(5),
             currentInstant.minusSeconds(5),
             getRegistrationContext(KEY_2 to VALUE_2)
         )
@@ -81,6 +85,7 @@ class RegistrationRequestEntityTest {
             HOLDING_ID_1,
             REGISTRATION_STATUS_1,
             currentInstant,
+            currentInstant,
             getRegistrationContext(KEY_1 to VALUE_1)
         )
         assertEquals(e1, e1)
@@ -94,6 +99,7 @@ class RegistrationRequestEntityTest {
             HOLDING_ID_1,
             REGISTRATION_STATUS_1,
             currentInstant,
+            currentInstant,
             getRegistrationContext(KEY_1 to VALUE_1)
         )
         assertNotEquals(e1, null)
@@ -105,6 +111,7 @@ class RegistrationRequestEntityTest {
             randomId,
             HOLDING_ID_1,
             REGISTRATION_STATUS_1,
+            currentInstant,
             currentInstant,
             getRegistrationContext(KEY_1 to VALUE_1)
         )

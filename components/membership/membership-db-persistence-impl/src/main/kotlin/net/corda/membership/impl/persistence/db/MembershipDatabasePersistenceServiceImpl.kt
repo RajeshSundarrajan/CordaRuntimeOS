@@ -25,6 +25,8 @@ import net.corda.messaging.api.subscription.factory.SubscriptionFactory
 import net.corda.orm.JpaEntitiesRegistry
 import net.corda.schema.Schemas
 import net.corda.schema.configuration.ConfigKeys
+import net.corda.utilities.time.Clock
+import net.corda.utilities.time.UTCClock
 import net.corda.v5.base.util.contextLogger
 import org.osgi.service.component.annotations.Activate
 import org.osgi.service.component.annotations.Component
@@ -46,7 +48,8 @@ class MembershipDatabasePersistenceServiceImpl @Activate constructor(
     @Reference(service = MemberInfoFactory::class)
     private val memberInfoFactory: MemberInfoFactory,
     @Reference(service = CordaAvroSerializationFactory::class)
-    private val cordaAvroSerializationFactory: CordaAvroSerializationFactory
+    private val cordaAvroSerializationFactory: CordaAvroSerializationFactory,
+    private val clock: Clock = UTCClock()
 ) : MembershipDatabasePersistenceService {
 
     private companion object {
@@ -118,6 +121,7 @@ class MembershipDatabasePersistenceServiceImpl @Activate constructor(
                         responseType = MembershipPersistenceResponse::class.java
                     ),
                     responderProcessor = MembershipDatabasePersistenceRPCProcessor(
+                        clock,
                         dbConnectionManager,
                         jpaEntitiesRegistry,
                         memberInfoFactory,

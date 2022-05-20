@@ -25,6 +25,7 @@ import net.corda.membership.impl.toSortedMap
 import net.corda.membership.read.MembershipGroupReaderProvider
 import net.corda.messaging.api.publisher.RPCSender
 import net.corda.messaging.api.records.Record
+import net.corda.utilities.time.Clock
 import net.corda.v5.base.concurrent.getOrThrow
 import net.corda.v5.base.exceptions.CordaRuntimeException
 import net.corda.v5.base.types.MemberX500Name
@@ -43,6 +44,7 @@ import java.time.Instant
 import java.util.*
 
 class StartRegistrationHandler(
+    private val clock: Clock,
     private val layeredPropertyMapFactory: LayeredPropertyMapFactory,
     private val memberInfoFactory: MemberInfoFactory,
     private val membershipGroupReaderProvider: MembershipGroupReaderProvider,
@@ -157,7 +159,7 @@ class StartRegistrationHandler(
     }
 
     private fun buildPendingMemberInfo(registrationRequest: RegistrationRequest): MemberInfo {
-        val now = Instant.now().toString()
+        val now = clock.instant().toString()
         return memberInfoFactory.create(
             registrationRequest.entries.associate { it.key to it.value }.toSortedMap(),
             sortedMapOf(
@@ -194,7 +196,7 @@ class StartRegistrationHandler(
     }
 
     private fun buildMembershipRequestContext(holdingIdentityId: String) = MembershipRequestContext(
-        Instant.now(),
+        clock.instant(),
         UUID.randomUUID().toString(),
         holdingIdentityId
     )

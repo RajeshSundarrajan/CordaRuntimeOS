@@ -49,6 +49,8 @@ import net.corda.schema.Schemas
 import net.corda.schema.configuration.MessagingConfig.Boot.INSTANCE_ID
 import net.corda.schema.configuration.MessagingConfig.Bus.BUS_TYPE
 import net.corda.test.util.eventually
+import net.corda.utilities.time.Clock
+import net.corda.utilities.time.UTCClock
 import net.corda.v5.base.concurrent.getOrThrow
 import net.corda.v5.base.types.MemberX500Name
 import net.corda.v5.base.types.toHexString
@@ -76,7 +78,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.osgi.test.common.annotation.InjectService
 import org.osgi.test.junit5.service.ServiceExtension
 import java.nio.ByteBuffer
-import java.time.Instant
 import java.util.UUID.randomUUID
 import javax.persistence.EntityManagerFactory
 
@@ -140,6 +141,8 @@ class MembershipPersistenceTest {
         private lateinit var rpcSender: RPCSender<MembershipPersistenceRequest, MembershipPersistenceResponse>
         private lateinit var cordaAvroSerializer: CordaAvroSerializer<KeyValuePairList>
         private lateinit var cordaAvroDeserializer: CordaAvroDeserializer<KeyValuePairList>
+
+        private val testClock: Clock = UTCClock()
 
 
         @JvmStatic
@@ -232,7 +235,7 @@ class MembershipPersistenceTest {
         val status = RegistrationStatus.NEW
         val rpcRequest = MembershipPersistenceRequest(
             MembershipRequestContext(
-                Instant.now(),
+                testClock.instant(),
                 randomUUID().toString(),
                 holdingIdentityId
             ),
@@ -312,7 +315,7 @@ class MembershipPersistenceTest {
 
         val rpcRequest = MembershipPersistenceRequest(
             MembershipRequestContext(
-                Instant.now(),
+                testClock.instant(),
                 randomUUID().toString(),
                 holdingIdentityId
             ),

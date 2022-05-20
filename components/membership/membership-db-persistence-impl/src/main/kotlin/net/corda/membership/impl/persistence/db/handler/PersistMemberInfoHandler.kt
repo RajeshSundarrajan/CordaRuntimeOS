@@ -25,14 +25,14 @@ class PersistMemberInfoHandler(
     override fun invoke(context: MembershipRequestContext, request: PersistMemberInfo): Any? {
         if (request.members.isNotEmpty()) {
             logger.info("Persisting member information.")
-            transaction(context) { em ->
+            transaction(context.holdingIdentityId) { em ->
                 request.members.forEach {
                     val memberInfo = memberInfoFactory.createFromAvro(it)
                     val entity = MemberInfoEntity(
                         memberInfo.groupId,
                         memberInfo.name.toString(),
                         memberInfo.status,
-                        Instant.now(),
+                        clock.instant(),
                         serializeContext(it.memberContext),
                         serializeContext(it.mgmContext),
                         memberInfo.serial

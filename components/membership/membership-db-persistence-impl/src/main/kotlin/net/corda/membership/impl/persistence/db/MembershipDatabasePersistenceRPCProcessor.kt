@@ -15,17 +15,20 @@ import net.corda.membership.impl.persistence.db.handler.PersistenceHandler
 import net.corda.membership.impl.persistence.db.handler.PersistenceHandlerServices
 import net.corda.messaging.api.processor.RPCResponderProcessor
 import net.corda.orm.JpaEntitiesRegistry
+import net.corda.utilities.time.Clock
 import net.corda.v5.base.util.contextLogger
+import net.corda.virtualnode.read.VirtualNodeInfoReadService
 import java.lang.reflect.Constructor
-import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
 class MembershipDatabasePersistenceRPCProcessor(
+    private val clock: Clock,
     dbConnectionManager: DbConnectionManager,
     jpaEntitiesRegistry: JpaEntitiesRegistry,
     memberInfoFactory: MemberInfoFactory,
-    cordaAvroSerializationFactory: CordaAvroSerializationFactory
+    cordaAvroSerializationFactory: CordaAvroSerializationFactory,
+    virtualNodeInfoReadService: VirtualNodeInfoReadService
 ) : RPCResponderProcessor<MembershipPersistenceRequest, MembershipPersistenceResponse> {
 
     private companion object {
@@ -38,10 +41,12 @@ class MembershipDatabasePersistenceRPCProcessor(
     )
     private val constructors = ConcurrentHashMap<Class<*>, Constructor<*>>()
     private val persistenceHandlerServices = PersistenceHandlerServices(
+        clock,
         dbConnectionManager,
         jpaEntitiesRegistry,
         memberInfoFactory,
-        cordaAvroSerializationFactory
+        cordaAvroSerializationFactory,
+        virtualNodeInfoReadService
     )
 
     override fun onNext(
@@ -80,7 +85,7 @@ class MembershipDatabasePersistenceRPCProcessor(
 
     private fun buildResponseContext(requestContext: MembershipRequestContext): MembershipResponseContext {
         return with(requestContext) {
-            MembershipResponseContext(requestTimestamp, requestId, Instant.now(), holdingIdentityId)
+            MembershipResponseContext(requestTimestamp, requestId, clock.instant(), holdingIdentityId)
         }
     }
 }
