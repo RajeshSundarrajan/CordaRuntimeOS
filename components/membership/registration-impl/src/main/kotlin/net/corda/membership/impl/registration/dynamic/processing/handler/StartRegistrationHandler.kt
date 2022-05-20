@@ -1,5 +1,7 @@
 package net.corda.membership.impl.registration.dynamic.processing.handler
 
+import net.corda.data.CordaAvroDeserializer
+import net.corda.data.CordaAvroSerializationFactory
 import net.corda.data.KeyValuePairList
 import net.corda.data.membership.PersistentMemberInfo
 import net.corda.data.membership.command.registration.DeclineRegistration
@@ -36,7 +38,6 @@ import net.corda.v5.membership.toAvro
 import net.corda.virtualnode.HoldingIdentity
 import net.corda.virtualnode.toAvro
 import net.corda.virtualnode.toCorda
-import java.nio.ByteBuffer
 import java.time.Duration
 import java.time.Instant
 import java.util.*
@@ -45,6 +46,7 @@ class StartRegistrationHandler(
     private val layeredPropertyMapFactory: LayeredPropertyMapFactory,
     private val memberInfoFactory: MemberInfoFactory,
     private val membershipGroupReaderProvider: MembershipGroupReaderProvider,
+    cordaAvroSerializationFactory: CordaAvroSerializationFactory,
     private val databaseSender: RPCSender<MembershipPersistenceRequest, MembershipPersistenceResponse>
 ) : RegistrationHandler {
 
@@ -54,7 +56,15 @@ class StartRegistrationHandler(
         val logger = contextLogger()
     }
 
+    private val keyValuePairListDeserializer: CordaAvroDeserializer<KeyValuePairList> =
+        cordaAvroSerializationFactory.createAvroDeserializer({
+            logger.error("Deserialization of registration request KeyValuePairList failed.")
+        }, KeyValuePairList::class.java)
+
     override fun invoke(command: Record<String, RegistrationCommand>): RegistrationHandlerResult {
+        require(command.value!!.command is StartRegistration) {
+            "Incorrect handler used for command of type ${command.value!!.command::class.java}"
+        }
         val startRegistrationCommand = command.value!!.command as StartRegistration
         // 1) persist the received registration request before verifying it's contents
         persistRegistrationRequest(startRegistrationCommand)
@@ -64,15 +74,20 @@ class StartRegistrationHandler(
         val registeringMember = startRegistrationCommand.source.toCorda()
 
         val regRq: RegistrationRequest = layeredPropertyMapFactory.create<RegistrationRequestImpl>(
-            startRegistrationCommand.memberRegistrationRequest.memberContext.getAsMap()
+            keyValuePairListDeserializer.deserialize(
+                startRegistrationCommand.memberRegistrationRequest.memberContext.array()
+            )?.toSortedMap() ?: emptyMap()
         )
         val pendingMemberInfo = buildPendingMemberInfo(regRq)
 
         val outputCommand = RegistrationCommand(
             try {
-                // 2.1) The destination is an MGM
+                validateRegistrationRequest(regRq.entries.isNotEmpty()) {
+                    "Empty member context in the registration request."
+                }
                 val mgmMemberName = MemberX500Name.parse(mgm.x500Name)
                 val mgmMemberInfo = membershipGroupReaderProvider.getGroupReader(mgm).lookup(mgmMemberName)
+                // The destination is an MGM
                 validateRegistrationRequest(mgmMemberInfo != null) {
                     "Could not find MGM matching name: [$mgmMemberName]"
                 }
@@ -80,27 +95,25 @@ class StartRegistrationHandler(
                     "Registration request is targeted at non-MGM holding identity."
                 }
 
-                // 2.2) The signature over the member context is valid
-                // 2.3) Parse the registration request and verify contents
-                // 2.3.1) The MemberX500Name matches the source MemberX500Name from the P2P messaging
+                // 2.2) The signature over the member context is valid - To do
+
+                // Parse the registration request and verify contents
+                // The MemberX500Name matches the source MemberX500Name from the P2P messaging
                 validateRegistrationRequest(pendingMemberInfo.name == MemberX500Name.parse(registeringMember.x500Name)) {
                     "MemberX500Name in registration request does not match member sending request over P2P."
                 }
 
-                // 2.3.2) The MemberX500Name is not a duplicate
+                // The MemberX500Name is not a duplicate
                 validateRegistrationRequest(queryMemberInfo(mgm, registeringMember) == null) {
                     "Member Info already exists for applying member"
                 }
 
-                // 2.3.3) The MemberX500Name is not similar to existing names
-
-
-                // 2.3.4) The group ID matches the group ID of the MGM
+                // The group ID matches the group ID of the MGM
                 validateRegistrationRequest(pendingMemberInfo.groupId == mgmMemberInfo.groupId) {
                     "Group ID in registration request does not match the group ID of the target MGM."
                 }
 
-                // 2.3.5) There is at least one endpoint specified
+                // There is at least one endpoint specified
                 validateRegistrationRequest(pendingMemberInfo.endpoints.isNotEmpty()) {
                     "Registering member has not specified any endpoints"
                 }
@@ -143,8 +156,6 @@ class StartRegistrationHandler(
         }
     }
 
-    private fun ByteBuffer.getAsMap() = KeyValuePairList.fromByteBuffer(this).toSortedMap()
-
     private fun buildPendingMemberInfo(registrationRequest: RegistrationRequest): MemberInfo {
         val now = Instant.now().toString()
         return memberInfoFactory.create(
@@ -174,9 +185,11 @@ class StartRegistrationHandler(
         val avroMemberInfo = memberInfo.toAvro()
         MembershipPersistenceRequest(
             buildMembershipRequestContext(mgm.id),
-            PersistMemberInfo(listOf(
-                PersistentMemberInfo(mgm.toAvro(), avroMemberInfo.memberContext, avroMemberInfo.mgmContext)
-            ))
+            PersistMemberInfo(
+                listOf(
+                    PersistentMemberInfo(mgm.toAvro(), avroMemberInfo.memberContext, avroMemberInfo.mgmContext)
+                )
+            )
         ).execute()
     }
 

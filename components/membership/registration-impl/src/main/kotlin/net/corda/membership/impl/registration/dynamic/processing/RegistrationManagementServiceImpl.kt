@@ -2,6 +2,7 @@ package net.corda.membership.impl.registration.dynamic.processing
 
 import net.corda.configuration.read.ConfigChangedEvent
 import net.corda.configuration.read.ConfigurationReadService
+import net.corda.data.CordaAvroSerializationFactory
 import net.corda.data.membership.command.registration.RegistrationCommand
 import net.corda.data.membership.db.request.MembershipPersistenceRequest
 import net.corda.data.membership.db.response.MembershipPersistenceResponse
@@ -52,7 +53,9 @@ class RegistrationManagementServiceImpl @Activate constructor(
     @Reference(service = MemberInfoFactory::class)
     private val memberInfoFactory: MemberInfoFactory,
     @Reference(service = MembershipGroupReaderProvider::class)
-    private val membershipGroupReaderProvider: MembershipGroupReaderProvider
+    private val membershipGroupReaderProvider: MembershipGroupReaderProvider,
+    @Reference(service = CordaAvroSerializationFactory::class)
+    private val cordaAvroSerializationFactory: CordaAvroSerializationFactory
 ) : RegistrationManagementService {
 
     companion object {
@@ -142,6 +145,7 @@ class RegistrationManagementServiceImpl @Activate constructor(
                         layeredPropertyMapFactory,
                         memberInfoFactory,
                         membershipGroupReaderProvider,
+                        cordaAvroSerializationFactory,
                         databaseSender!!
                     ),
                     messagingConfig

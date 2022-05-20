@@ -1,5 +1,6 @@
 package net.corda.membership.impl.registration.dynamic.processing
 
+import net.corda.data.CordaAvroSerializationFactory
 import net.corda.data.membership.command.registration.ApproveRegistration
 import net.corda.data.membership.command.registration.DeclineRegistration
 import net.corda.data.membership.command.registration.ProcessMemberVerification
@@ -24,6 +25,7 @@ class RegistrationProcessor(
     layeredPropertyMapFactory: LayeredPropertyMapFactory,
     memberInfoFactory: MemberInfoFactory,
     membershipGroupReaderProvider: MembershipGroupReaderProvider,
+    cordaAvroSerializationFactory: CordaAvroSerializationFactory,
     databaseSender: RPCSender<MembershipPersistenceRequest, MembershipPersistenceResponse>
 ) : StateAndEventProcessor<String, RegistrationState, RegistrationCommand> {
 
@@ -40,6 +42,7 @@ class RegistrationProcessor(
             layeredPropertyMapFactory,
             memberInfoFactory,
             membershipGroupReaderProvider,
+            cordaAvroSerializationFactory,
             databaseSender
         )
     )
@@ -57,22 +60,26 @@ class RegistrationProcessor(
             }
             is VerifyMember -> {
                 logger.info("Received verify member during registration command.")
+                logger.warn("Unimplemented command.")
                 null
             }
             is ProcessMemberVerification -> {
                 logger.info("Received process member during registration command.")
+                logger.warn("Unimplemented command.")
                 null
             }
             is ApproveRegistration -> {
                 logger.info("Received approve registration command.")
+                logger.warn("Unimplemented command.")
                 null
             }
             is DeclineRegistration -> {
                 logger.info("Received decline registration command.")
+                logger.warn("Unimplemented command.")
                 null
             }
             else -> {
-                logger.info("Unhandled registration command received.")
+                logger.warn("Unhandled registration command received.")
                 createEmptyResult(state)
             }
         }

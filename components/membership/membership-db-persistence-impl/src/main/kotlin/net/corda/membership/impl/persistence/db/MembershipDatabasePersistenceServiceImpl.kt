@@ -2,6 +2,7 @@ package net.corda.membership.impl.persistence.db
 
 import net.corda.configuration.read.ConfigChangedEvent
 import net.corda.configuration.read.ConfigurationReadService
+import net.corda.data.CordaAvroSerializationFactory
 import net.corda.data.membership.db.request.MembershipPersistenceRequest
 import net.corda.data.membership.db.response.MembershipPersistenceResponse
 import net.corda.db.connection.manager.DbConnectionManager
@@ -43,7 +44,9 @@ class MembershipDatabasePersistenceServiceImpl @Activate constructor(
     @Reference(service = JpaEntitiesRegistry::class)
     private val jpaEntitiesRegistry: JpaEntitiesRegistry,
     @Reference(service = MemberInfoFactory::class)
-    private val memberInfoFactory: MemberInfoFactory
+    private val memberInfoFactory: MemberInfoFactory,
+    @Reference(service = CordaAvroSerializationFactory::class)
+    private val cordaAvroSerializationFactory: CordaAvroSerializationFactory
 ) : MembershipDatabasePersistenceService {
 
     private companion object {
@@ -117,7 +120,8 @@ class MembershipDatabasePersistenceServiceImpl @Activate constructor(
                     responderProcessor = MembershipDatabasePersistenceRPCProcessor(
                         dbConnectionManager,
                         jpaEntitiesRegistry,
-                        memberInfoFactory
+                        memberInfoFactory,
+                        cordaAvroSerializationFactory
                     ),
                     messagingConfig = event.config.toMessagingConfig()
                 ).also {

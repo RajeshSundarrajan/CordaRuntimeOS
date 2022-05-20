@@ -1,12 +1,13 @@
 package net.corda.membership.impl.p2p.handler
 
 import net.corda.messaging.api.records.Record
-import net.corda.p2p.app.AuthenticatedMessage
+import net.corda.p2p.app.AuthenticatedMessageHeader
+import java.nio.ByteBuffer
 
 abstract class AuthenticatedMessageHandler : MessageHandler {
-    override fun invoke(msg: Any): Record<*, *> {
-        if (msg is AuthenticatedMessage) {
-            return invokeAutheticatedMessage(msg)
+    override fun invoke(header: Any, payload: ByteBuffer): Record<*, *> {
+        if (header is AuthenticatedMessageHeader) {
+            return invokeAutheticatedMessage(header, payload)
         } else {
             throw UnsupportedOperationException(
                 "Handler does not support message type. Only AuthenticatedMessage is allowed."
@@ -14,6 +15,6 @@ abstract class AuthenticatedMessageHandler : MessageHandler {
         }
     }
 
-    abstract fun invokeAutheticatedMessage(msg: AuthenticatedMessage): Record<*, *>
+    abstract fun invokeAutheticatedMessage(header: AuthenticatedMessageHeader, payload: ByteBuffer): Record<*, *>
 }
 

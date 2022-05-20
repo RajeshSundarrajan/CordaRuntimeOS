@@ -2,6 +2,9 @@ package net.corda.membership.impl.persistence.db
 
 import com.typesafe.config.ConfigFactory
 import net.corda.configuration.read.ConfigurationReadService
+import net.corda.data.CordaAvroDeserializer
+import net.corda.data.CordaAvroSerializationFactory
+import net.corda.data.CordaAvroSerializer
 import net.corda.data.KeyValuePair
 import net.corda.data.KeyValuePairList
 import net.corda.data.crypto.wire.CryptoSignatureWithKey
@@ -62,6 +65,7 @@ import net.corda.v5.membership.SOFTWARE_VERSION
 import net.corda.v5.membership.STATUS
 import net.corda.v5.membership.URL_KEY
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.fail
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -73,7 +77,6 @@ import org.osgi.test.common.annotation.InjectService
 import org.osgi.test.junit5.service.ServiceExtension
 import java.nio.ByteBuffer
 import java.time.Instant
-import java.util.*
 import java.util.UUID.randomUUID
 import javax.persistence.EntityManagerFactory
 
@@ -104,6 +107,9 @@ class MembershipPersistenceTest {
         @InjectService(timeout = 5000)
         lateinit var lifecycleCoordinatorFactory: LifecycleCoordinatorFactory
 
+        @InjectService(timeout = 5000)
+        lateinit var cordaAvroSerializationFactory: CordaAvroSerializationFactory
+
         val logger = contextLogger()
 
         private const val BOOT_CONFIG_STRING = """
@@ -114,7 +120,7 @@ class MembershipPersistenceTest {
         private const val MEMBER_CONTEXT_KEY = "key"
         private const val MEMBER_CONTEXT_VALUE = "value"
 
-        private val groupId = UUID.randomUUID().toString()
+        private val groupId = randomUUID().toString()
         private val x500Name = MemberX500Name.parse("O=Alice, C=GB, L=London")
         private val viewOwningHoldingIdentity = HoldingIdentity(x500Name.toString(), groupId)
         private val holdingIdentityId: String =
@@ -132,6 +138,9 @@ class MembershipPersistenceTest {
 
         private lateinit var vnodeEmf: EntityManagerFactory
         private lateinit var rpcSender: RPCSender<MembershipPersistenceRequest, MembershipPersistenceResponse>
+        private lateinit var cordaAvroSerializer: CordaAvroSerializer<KeyValuePairList>
+        private lateinit var cordaAvroDeserializer: CordaAvroDeserializer<KeyValuePairList>
+
 
         @JvmStatic
         @BeforeAll
@@ -158,6 +167,9 @@ class MembershipPersistenceTest {
                 }
             }
             coordinator.start()
+            cordaAvroSerializer = cordaAvroSerializationFactory.createAvroSerializer { }
+            cordaAvroDeserializer =
+                cordaAvroSerializationFactory.createAvroDeserializer({ }, KeyValuePairList::class.java)
             val dbInstaller = DatabaseInstaller(entityManagerFactoryFactory, lbm, entitiesRegistry)
             vnodeEmf = dbInstaller.setupDatabase(vnodeDbInfo, "vnode-vault", MembershipEntities.classes)
             dbInstaller.setupClusterDatabase(clusterDbInfo, "config", ConfigurationEntities.classes).close()
@@ -228,11 +240,15 @@ class MembershipPersistenceTest {
                 status,
                 MembershipRegistrationRequest(
                     registrationId,
-                    KeyValuePairList(
-                        listOf(
-                            KeyValuePair(MEMBER_CONTEXT_KEY, MEMBER_CONTEXT_VALUE)
+                    ByteBuffer.wrap(
+                        cordaAvroSerializer.serialize(
+                            KeyValuePairList(
+                                listOf(
+                                    KeyValuePair(MEMBER_CONTEXT_KEY, MEMBER_CONTEXT_VALUE)
+                                )
+                            )
                         )
-                    ).toByteBuffer(),
+                    ) ?: fail("Failed to serialize KeyValuePairList"),
                     CryptoSignatureWithKey(
                         ByteBuffer.wrap(byteArrayOf()),
                         ByteBuffer.wrap(byteArrayOf())
@@ -264,10 +280,12 @@ class MembershipPersistenceTest {
             .isAfterOrEqualTo(rpcRequest.context.requestTimestamp)
             .isBeforeOrEqualTo(rpcResponse.context.responseTimestamp)
 
-        val persistedMemberContext = KeyValuePairList.fromByteBuffer(ByteBuffer.wrap(persistedEntity.context))
-        assertThat(persistedMemberContext.items.size).isEqualTo(1)
-        assertThat(persistedMemberContext.items[0].key).isEqualTo(MEMBER_CONTEXT_KEY)
-        assertThat(persistedMemberContext.items[0].value).isEqualTo(MEMBER_CONTEXT_VALUE)
+        val persistedMemberContext = persistedEntity.context.deserializeContextAsMap()
+        with(persistedMemberContext.entries) {
+            assertThat(size).isEqualTo(1)
+            assertThat(first().key).isEqualTo(MEMBER_CONTEXT_KEY)
+            assertThat(first().value).isEqualTo(MEMBER_CONTEXT_VALUE)
+        }
     }
 
     @Test
@@ -334,31 +352,26 @@ class MembershipPersistenceTest {
         assertThat(persistedEntity.serialNumber).isEqualTo(1)
         assertThat(persistedEntity.status).isEqualTo(MEMBER_STATUS_ACTIVE)
 
-        val persistedMgmContext =
-            KeyValuePairList.fromByteBuffer(
-                ByteBuffer.wrap(persistedEntity.mgmContext)
-            ).items.associate { it.key to it.value }
-        assertThat(persistedMgmContext[STATUS]).isNotNull
-        assertThat(persistedMgmContext[STATUS]).isEqualTo(MEMBER_STATUS_ACTIVE)
+        fun contextIsEqual(actual: String?, expected: String) = assertThat(actual).isNotNull.isEqualTo(expected)
 
-        val persistedMemberContext =
-            KeyValuePairList.fromByteBuffer(
-                ByteBuffer.wrap(persistedEntity.memberContext)
-            ).items.associate { it.key to it.value }
+        val persistedMgmContext = persistedEntity.mgmContext.deserializeContextAsMap()
+        contextIsEqual(persistedMgmContext[STATUS], MEMBER_STATUS_ACTIVE)
 
-        assertThat(persistedMemberContext[String.format(URL_KEY, "0")]).isNotNull
-        assertThat(persistedMemberContext[String.format(URL_KEY, "0")]).isEqualTo(endpointUrl)
-        assertThat(persistedMemberContext[String.format(PROTOCOL_VERSION, "0")]).isNotNull
-        assertThat(persistedMemberContext[String.format(PROTOCOL_VERSION, "0")]).isEqualTo("1")
-        assertThat(persistedMemberContext[GROUP_ID]).isNotNull
-        assertThat(persistedMemberContext[GROUP_ID]).isEqualTo(groupId)
-        assertThat(persistedMemberContext[PARTY_NAME]).isNotNull
-        assertThat(persistedMemberContext[PARTY_NAME]).isEqualTo(memberx500Name.toString())
-        assertThat(persistedMemberContext[PLATFORM_VERSION]).isNotNull
-        assertThat(persistedMemberContext[PLATFORM_VERSION]).isEqualTo("11")
-        assertThat(persistedMemberContext[SERIAL]).isNotNull
-        assertThat(persistedMemberContext[SERIAL]).isEqualTo("1")
-        assertThat(persistedMemberContext[SOFTWARE_VERSION]).isNotNull
-        assertThat(persistedMemberContext[SOFTWARE_VERSION]).isEqualTo("5.0.0")
+        val persistedMemberContext = persistedEntity.memberContext.deserializeContextAsMap()
+        with(persistedMemberContext) {
+            contextIsEqual(get(String.format(URL_KEY, "0")), endpointUrl)
+            contextIsEqual(get(String.format(PROTOCOL_VERSION, "0")), "1")
+            contextIsEqual(get(GROUP_ID), groupId)
+            contextIsEqual(get(PARTY_NAME), memberx500Name.toString())
+            contextIsEqual(get(PLATFORM_VERSION), "11")
+            contextIsEqual(get(SERIAL), "1")
+            contextIsEqual(get(SOFTWARE_VERSION), "5.0.0")
+        }
     }
+
+    fun ByteArray.deserializeContextAsMap(): Map<String, String> =
+        cordaAvroDeserializer.deserialize(this)
+            ?.items
+            ?.associate { it.key to it.value } ?: fail("Failed to deserialize context.")
+
 }

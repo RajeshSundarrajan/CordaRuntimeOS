@@ -24,7 +24,6 @@ import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
-import java.lang.UnsupportedOperationException
 import java.nio.ByteBuffer
 import java.util.*
 

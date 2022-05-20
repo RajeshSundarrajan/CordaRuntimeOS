@@ -1,5 +1,6 @@
 package net.corda.membership.impl.persistence.db.handler
 
+import net.corda.data.CordaAvroSerializationFactory
 import net.corda.data.membership.db.request.MembershipRequestContext
 import net.corda.db.connection.manager.DbConnectionManager
 import net.corda.db.core.DbPrivilege
@@ -25,12 +26,13 @@ abstract class BasePersistenceHandler<REQUEST>(
 
     private val dbConnectionManager get() = persistenceHandlerServices.dbConnectionManager
     private val jpaEntitiesRegistry get() = persistenceHandlerServices.jpaEntitiesRegistry
+    val cordaAvroSerializationFactory get() = persistenceHandlerServices.cordaAvroSerializationFactory
     val memberInfoFactory get() = persistenceHandlerServices.memberInfoFactory
 
     fun <R> transaction(context: MembershipRequestContext, block: (EntityManager) -> R) {
         getEntityManagerFactory(context).transaction(block)
     }
-    fun getEntityManagerFactory(context: MembershipRequestContext): EntityManagerFactory {
+    private fun getEntityManagerFactory(context: MembershipRequestContext): EntityManagerFactory {
         return dbConnectionManager.getOrCreateEntityManagerFactory(
             "vnode_vault_${context.holdingIdentityId}", // TEMP!!!!!! SHOULD BE A BETTER WAY TO GET THIS NAME
             DbPrivilege.DML,
@@ -46,4 +48,5 @@ data class PersistenceHandlerServices(
     val dbConnectionManager: DbConnectionManager,
     val jpaEntitiesRegistry: JpaEntitiesRegistry,
     val memberInfoFactory: MemberInfoFactory,
+    val cordaAvroSerializationFactory: CordaAvroSerializationFactory
 )

@@ -11,7 +11,9 @@ import net.corda.p2p.app.UnauthenticatedMessage
 import net.corda.schema.registry.AvroSchemaRegistry
 import net.corda.v5.base.exceptions.CordaRuntimeException
 import net.corda.v5.base.util.contextLogger
+import java.lang.reflect.Constructor
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 class MembershipP2PProcessor(
     private val avroSchemaRegistry: AvroSchemaRegistry
@@ -25,9 +27,11 @@ class MembershipP2PProcessor(
         const val MEMBERSHIP_P2P_SUBSYSTEM = "membership"
     }
 
-    private val messageProcessors = mapOf<Class<*>, MessageHandler>(
-        MembershipRegistrationRequest::class.java to RegistrationRequestHandler(avroSchemaRegistry)
+    private val messageProcessors = mapOf<Class<*>, Class<out MessageHandler>>(
+        MembershipRegistrationRequest::class.java to RegistrationRequestHandler::class.java
     )
+
+    private val constructors = ConcurrentHashMap<Class<*>, Constructor<*>>()
 
     override fun onNext(events: List<Record<String, AppMessage>>): List<Record<*, *>> {
         return events.mapNotNull { it.value?.message }
@@ -45,13 +49,36 @@ class MembershipP2PProcessor(
                     logger.error("Unexpected exception occurred.", ex)
                     null
                 }
-                val processor = classType?.let { messageProcessors[it] }
+                val processor = try {
+                    classType?.let { getHandler(it) }
+                } catch (ex: MembershipP2PException) {
+                    logger.error("Could not get handler for request.", ex)
+                    null
+                }
                 if (processor == null) {
                     logger.warn("No processor found for message of type $classType.")
                 }
-                processor?.invoke(msg)
+                processor?.invoke(
+                    msg.header,
+                    msg.payload
+                )
             }
     }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun getHandler(requestClass: Class<*>): MessageHandler {
+        return constructors.computeIfAbsent(requestClass) {
+            val type = messageProcessors[requestClass] ?: throw MembershipP2PException(
+                "No handler has been registered to handle the p2p request received." +
+                        "Request received: [$requestClass]"
+            )
+            type.constructors.first {
+                it.parameterCount == 1 && it.parameterTypes[0].isAssignableFrom(AvroSchemaRegistry::class.java)
+            }.apply { isAccessible = true }
+        }.newInstance(avroSchemaRegistry) as MessageHandler
+    }
+
+    class MembershipP2PException(msg: String) : CordaRuntimeException(msg)
 
     private fun Any.isMembershipSubsystem(): Boolean {
         return (this as? AuthenticatedMessage)?.isMembershipSubsystem() ?: false
@@ -60,6 +87,13 @@ class MembershipP2PProcessor(
 
     private fun AuthenticatedMessage.isMembershipSubsystem() = header.subsystem == MEMBERSHIP_P2P_SUBSYSTEM
     private fun UnauthenticatedMessage.isMembershipSubsystem() = header.subsystem == MEMBERSHIP_P2P_SUBSYSTEM
+
+    private val Any.header: Any
+        get() = (this as? AuthenticatedMessage)?.header
+            ?: (this as? UnauthenticatedMessage)?.header
+            ?: throw UnsupportedOperationException(
+                "Tried to get header from message other than AuthenticatedMessage or UnauthenticatedMessage."
+            )
 
     private val Any.payload: ByteBuffer
         get() = (this as? AuthenticatedMessage)?.payload

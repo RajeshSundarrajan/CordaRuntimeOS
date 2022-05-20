@@ -1,5 +1,6 @@
 package net.corda.membership.impl.persistence.db
 
+import net.corda.data.CordaAvroSerializationFactory
 import net.corda.data.membership.db.request.MembershipPersistenceRequest
 import net.corda.data.membership.db.request.MembershipRequestContext
 import net.corda.data.membership.db.request.command.PersistMemberInfo
@@ -23,7 +24,8 @@ import java.util.concurrent.ConcurrentHashMap
 class MembershipDatabasePersistenceRPCProcessor(
     dbConnectionManager: DbConnectionManager,
     jpaEntitiesRegistry: JpaEntitiesRegistry,
-    memberInfoFactory: MemberInfoFactory
+    memberInfoFactory: MemberInfoFactory,
+    cordaAvroSerializationFactory: CordaAvroSerializationFactory
 ) : RPCResponderProcessor<MembershipPersistenceRequest, MembershipPersistenceResponse> {
 
     private companion object {
@@ -39,6 +41,7 @@ class MembershipDatabasePersistenceRPCProcessor(
         dbConnectionManager,
         jpaEntitiesRegistry,
         memberInfoFactory,
+        cordaAvroSerializationFactory
     )
 
     override fun onNext(
