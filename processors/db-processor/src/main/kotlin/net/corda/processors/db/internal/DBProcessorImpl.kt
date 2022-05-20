@@ -30,7 +30,7 @@ import net.corda.lifecycle.StartEvent
 import net.corda.lifecycle.StopEvent
 import net.corda.lifecycle.createCoordinator
 import net.corda.membership.datamodel.MembershipEntities
-import net.corda.membership.persistence.db.MembershipDatabasePersistenceService
+import net.corda.membership.persistence.MembershipPersistenceService
 import net.corda.orm.JpaEntitiesRegistry
 import net.corda.permissions.model.RbacEntities
 import net.corda.permissions.storage.reader.PermissionStorageReaderService
@@ -82,8 +82,8 @@ class DBProcessorImpl @Activate constructor(
     private val cpiInfoWriteService: CpiInfoWriteService,
     @Reference(service = ReconcilerFactory::class)
     private val reconcilerFactory: ReconcilerFactory,
-    @Reference(service = MembershipDatabasePersistenceService::class)
-    private val membershipDatabasePersistenceService: MembershipDatabasePersistenceService
+    @Reference(service = MembershipPersistenceService::class)
+    private val membershipPersistenceService: MembershipPersistenceService
 ) : DBProcessor {
     init {
         // define the different DB Entity Sets
@@ -117,7 +117,7 @@ class DBProcessorImpl @Activate constructor(
         ::cpkReadService,
         ::cpiInfoReadService,
         ::cpiInfoWriteService,
-        ::membershipDatabasePersistenceService
+        ::membershipPersistenceService
     )
 
     private var cpiInfoDbReader: CpiInfoDbReader? = null
