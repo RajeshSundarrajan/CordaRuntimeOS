@@ -97,26 +97,19 @@ class MembershipP2PIntegrationTest {
         @BeforeAll
         fun setUp() {
             val coordinator = lifecycleCoordinatorFactory.createCoordinator<MembershipP2PIntegrationTest> { e, c ->
-                when (e) {
-                    is StartEvent -> {
-                        logger.info("Starting test coordinator")
-                        c.followStatusChangesByName(
-                            setOf(
-                                LifecycleCoordinatorName.forComponent<ConfigurationReadService>(),
-                                LifecycleCoordinatorName.forComponent<MembershipP2PReadService>()
-                            )
+                if (e is StartEvent) {
+                    logger.info("Starting test coordinator")
+                    c.followStatusChangesByName(
+                        setOf(
+                            LifecycleCoordinatorName.forComponent<ConfigurationReadService>(),
+                            LifecycleCoordinatorName.forComponent<MembershipP2PReadService>()
                         )
-                    }
-                    is RegistrationStatusChangeEvent -> {
-                        logger.info("Test coordinator is ${e.status}")
-                        c.updateStatus(e.status)
-                    }
-                    else -> {
-                        logger.info("Received and ignored event $e.")
-                    }
+                    )
+                } else if (e is RegistrationStatusChangeEvent) {
+                    logger.info("Test coordinator is ${e.status}")
+                    c.updateStatus(e.status)
                 }
-            }
-            coordinator.start()
+            }.also { it.start() }
 
             registrationRequestSerializer = cordaAvroSerializationFactory.createAvroSerializer { }
             keyValuePairListSerializer = cordaAvroSerializationFactory.createAvroSerializer { }

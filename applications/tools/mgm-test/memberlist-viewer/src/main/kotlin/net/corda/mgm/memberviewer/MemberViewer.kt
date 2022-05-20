@@ -4,10 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.config.ConfigValueFactory
 import net.corda.configuration.read.ConfigurationReadService
 import net.corda.libs.configuration.SmartConfigFactory
-import net.corda.membership.impl.MemberInfoExtension.Companion.endpoints
-import net.corda.membership.impl.MemberInfoExtension.Companion.identityKeyHashes
-import net.corda.membership.impl.MemberInfoExtension.Companion.modifiedTime
-import net.corda.membership.impl.MemberInfoExtension.Companion.status
 import net.corda.membership.read.MembershipGroupReader
 import net.corda.membership.read.MembershipGroupReaderProvider
 import net.corda.osgi.api.Application
