@@ -19,9 +19,12 @@ import net.corda.membership.read.MembershipGroupReaderProvider
 import net.corda.messaging.api.processor.StateAndEventProcessor
 import net.corda.messaging.api.publisher.RPCSender
 import net.corda.messaging.api.records.Record
+import net.corda.utilities.time.Clock
 import net.corda.v5.base.util.contextLogger
 
+@Suppress("LongParameterList")
 class RegistrationProcessor(
+    clock: Clock,
     layeredPropertyMapFactory: LayeredPropertyMapFactory,
     memberInfoFactory: MemberInfoFactory,
     membershipGroupReaderProvider: MembershipGroupReaderProvider,
@@ -39,6 +42,7 @@ class RegistrationProcessor(
 
     private val handlers = mapOf<Class<*>, RegistrationHandler>(
         StartRegistration::class.java to StartRegistrationHandler(
+            clock,
             layeredPropertyMapFactory,
             memberInfoFactory,
             membershipGroupReaderProvider,

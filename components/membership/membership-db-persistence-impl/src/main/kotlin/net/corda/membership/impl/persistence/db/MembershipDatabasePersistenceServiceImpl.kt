@@ -28,6 +28,7 @@ import net.corda.schema.configuration.ConfigKeys
 import net.corda.utilities.time.Clock
 import net.corda.utilities.time.UTCClock
 import net.corda.v5.base.util.contextLogger
+import net.corda.virtualnode.read.VirtualNodeInfoReadService
 import org.osgi.service.component.annotations.Activate
 import org.osgi.service.component.annotations.Component
 import org.osgi.service.component.annotations.Reference
@@ -49,7 +50,8 @@ class MembershipDatabasePersistenceServiceImpl @Activate constructor(
     private val memberInfoFactory: MemberInfoFactory,
     @Reference(service = CordaAvroSerializationFactory::class)
     private val cordaAvroSerializationFactory: CordaAvroSerializationFactory,
-    private val clock: Clock = UTCClock()
+    @Reference(service = VirtualNodeInfoReadService::class)
+    private val virtualNodeInfoReadService: VirtualNodeInfoReadService
 ) : MembershipDatabasePersistenceService {
 
     private companion object {
@@ -57,6 +59,8 @@ class MembershipDatabasePersistenceServiceImpl @Activate constructor(
 
         const val GROUP_NAME = "membership.db.persistence"
         const val CLIENT_NAME = "membership.db.persistence"
+
+        private val clock: Clock = UTCClock()
     }
 
     private val coordinator = coordinatorFactory.createCoordinator<MembershipDatabasePersistenceService>(::handleEvent)
@@ -125,7 +129,8 @@ class MembershipDatabasePersistenceServiceImpl @Activate constructor(
                         dbConnectionManager,
                         jpaEntitiesRegistry,
                         memberInfoFactory,
-                        cordaAvroSerializationFactory
+                        cordaAvroSerializationFactory,
+                        virtualNodeInfoReadService
                     ),
                     messagingConfig = event.config.toMessagingConfig()
                 ).also {

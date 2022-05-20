@@ -40,7 +40,6 @@ import net.corda.virtualnode.HoldingIdentity
 import net.corda.virtualnode.toAvro
 import net.corda.virtualnode.toCorda
 import java.time.Duration
-import java.time.Instant
 import java.util.*
 
 class StartRegistrationHandler(

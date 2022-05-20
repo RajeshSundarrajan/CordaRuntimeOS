@@ -32,6 +32,8 @@ import net.corda.schema.Schemas
 import net.corda.schema.Schemas.Membership.Companion.REGISTRATION_COMMANDS
 import net.corda.schema.configuration.ConfigKeys.BOOT_CONFIG
 import net.corda.schema.configuration.ConfigKeys.MESSAGING_CONFIG
+import net.corda.utilities.time.Clock
+import net.corda.utilities.time.UTCClock
 import net.corda.v5.base.util.contextLogger
 import org.osgi.service.component.annotations.Activate
 import org.osgi.service.component.annotations.Component
@@ -55,7 +57,7 @@ class RegistrationManagementServiceImpl @Activate constructor(
     @Reference(service = MembershipGroupReaderProvider::class)
     private val membershipGroupReaderProvider: MembershipGroupReaderProvider,
     @Reference(service = CordaAvroSerializationFactory::class)
-    private val cordaAvroSerializationFactory: CordaAvroSerializationFactory
+    private val cordaAvroSerializationFactory: CordaAvroSerializationFactory,
 ) : RegistrationManagementService {
 
     companion object {
@@ -63,6 +65,8 @@ class RegistrationManagementServiceImpl @Activate constructor(
 
         const val CONSUMER_GROUP = "membership_registration_processor"
         const val CLIENT_ID = "membership_registration_processor"
+
+        private val clock: Clock = UTCClock()
     }
 
     private val coordinator = lifecycleCoordinatorFactory
@@ -142,6 +146,7 @@ class RegistrationManagementServiceImpl @Activate constructor(
                         REGISTRATION_COMMANDS
                     ),
                     RegistrationProcessor(
+                        clock,
                         layeredPropertyMapFactory,
                         memberInfoFactory,
                         membershipGroupReaderProvider,
